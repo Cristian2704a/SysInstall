@@ -655,7 +655,7 @@ EOF
 
   sleep 2
 }
-}
+
 
 # Configuração do Nginx para o backend
 backend_nginx_setup() {
