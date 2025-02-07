@@ -5,6 +5,41 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [2.2.0] - 2025-02-07
+
+### Adicionado
+- Criação do manifest.json para PWA com nome personalizado
+- Sistema de divisão em dois arquivos (install.sh e core.sh)
+- Logs mais detalhados durante o processo de instalação
+- Função de criação do manifest.json antes do build do frontend
+- Pergunta para nome personalizado do PWA
+
+### Alterado
+- Reestruturado o código em dois arquivos principais para melhor manutenção
+- Melhorada a ordem de execução das instalações e configurações
+- Ajustada a configuração do PM2 para instalação via root
+- Ajustado o processo de build do frontend para garantir manifest.json
+- Atualizada a ordem das operações para otimizar o processo de instalação
+
+### Corrigido
+- Problema de permissão na instalação do PM2 global
+- Erro no processo de build do frontend por falta do manifest.json
+- Questão de instalação do NVM e Node.js para o usuário deploy
+- Configuração incorreta do PM2 startup
+- Erro na porta do Redis no firewall
+
+### Segurança
+- Ajustadas as permissões do manifest.json
+- Melhoradas as permissões de diretórios para o frontend
+- Fortalecida a segurança na criação de diretórios public
+
+### Técnico
+- Separação de responsabilidades entre arquivos do instalador
+- Otimizado o processo de criação do manifest.json
+- Implementada verificação de diretórios antes da criação do manifest.json
+- Melhorada a estrutura do código para manutenibilidade
+- Padronizada a ordem de execução das funções de instalação
+
 ## [2.1.0] - 2025-02-07
 
 ### Adicionado
