@@ -5,6 +5,49 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [2.3.0] - 2025-02-07
+
+### Adicionado
+- Compatibilidade com Ubuntu 24.04
+- Menu de otimização do sistema totalmente funcional
+- Configurações otimizadas para Nginx no Ubuntu 24.04
+- Novas configurações automáticas para PostgreSQL 16
+- Sistema avançado de remoção com duas opções (instância ou sistema completo)
+- Confirmação de segurança para remoção completa do sistema
+- Permissões adequadas para pastas compartilhadas entre deploy e www-data
+- Otimizações automáticas para Redis no Ubuntu 24.04
+
+### Alterado
+- Atualizado método de instalação do PostgreSQL para Ubuntu 24.04
+- Modificado processo de instalação do Redis para versão mais recente
+- Melhorada a gestão de permissões entre usuário deploy e www-data
+- Reestruturado menu do sistema para permitir múltiplas operações
+- Ajustada configuração do Node.js para Ubuntu 24.04
+- Otimizado processo de remoção do sistema
+- Atualizada configuração de repositórios para Ubuntu 24.04
+
+### Corrigido
+- Problema de permissões entre Nginx (www-data) e pastas do usuário deploy
+- Questão de herança de permissões em novos arquivos
+- Bug no menu de otimização que não executava a função
+- Problemas de compatibilidade com pacotes no Ubuntu 24.04
+- Loop infinito no menu do sistema
+- Remoção incompleta de sistema
+
+### Segurança
+- Implementada confirmação para remoção completa do sistema
+- Melhoradas as permissões de diretórios compartilhados
+- Fortalecida a segurança na criação de usuários e grupos
+- Ajustadas as permissões do Nginx
+
+### Técnico
+- Adicionado suporte a versões mais recentes de dependências
+- Implementada otimização automática do sistema
+- Melhorada a estrutura do menu principal
+- Reorganizado código de gerenciamento de permissões
+- Padronizada a configuração de serviços
+- Atualizada a documentação do sistema
+
 ## [2.2.0] - 2025-02-07
 
 ### Adicionado
