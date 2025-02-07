@@ -67,7 +67,44 @@ get_install_type() {
   esac
 }
 
-# Menu do sistema
+# Mover a função software_delete para antes do menu
+software_delete() {
+  print_banner
+  printf "${WHITE} 💻 Digite o nome da Instancia/Empresa que será Deletada:${GRAY_LIGHT}"
+  printf "\n\n"
+  read -p "> " empresa_delete
+
+  print_banner
+  printf "${WHITE} 💻 Removendo a instância ${empresa_delete}...${GRAY_LIGHT}"
+  printf "\n\n"
+
+  # Parar e remover serviços
+  sudo su - deploy <<EOF
+    pm2 delete ${empresa_delete}-backend
+    pm2 save
+    rm -rf /home/deploy/${empresa_delete}
+EOF
+
+  # Remover configurações do nginx
+  sudo rm -f /etc/nginx/sites-enabled/${empresa_delete}-*
+  sudo rm -f /etc/nginx/sites-available/${empresa_delete}-*
+
+  # Remover banco de dados
+  sudo su - postgres <<EOF
+    dropdb ${empresa_delete}
+    dropuser ${empresa_delete}
+EOF
+
+  # Reiniciar nginx
+  sudo systemctl restart nginx
+
+  print_banner
+  printf "${GREEN} ✅ Instância ${empresa_delete} removida com sucesso!${NC}"
+  printf "\n\n"
+  sleep 2
+}
+
+# Depois dela, vem o menu do sistema
 show_system_menu() {
   local installation_type=$1
   
@@ -634,7 +671,6 @@ sudo su - root << EOF
 cat > /etc/nginx/sites-available/${instancia_add}-backend << 'END'
 server {
   server_name $backend_hostname;
-  
   location / {
     proxy_pass http://127.0.0.1:${backend_port};
     proxy_http_version 1.1;
@@ -647,7 +683,7 @@ server {
     proxy_cache_bypass \$http_upgrade;
   }
 
-  # Bloquear solicitações de arquivos do GitHub
+  # BLoquear solicitacoes de arquivos do GitHub
   location ~ /\.git {
     deny all;
   }
@@ -670,9 +706,32 @@ frontend_install() {
 
   sudo su - deploy <<EOF
   cd /home/deploy/${instancia_add}/frontend
+  
+  # Limpar cache e módulos existentes
+  rm -rf node_modules
+  rm -rf build
+  
+  # Instalar TODAS as dependências (incluindo devDependencies)
   npm install --legacy-peer-deps
+  
+  # Configurar variáveis de ambiente para o build
+  export NODE_ENV=production
+  export CI=false
+  
+  # Realizar o build
   npm run build
+  
+  # Verificar se o build foi gerado corretamente
+  if [ ! -f "build/index.html" ]; then
+    printf "${RED} ❌ Erro ao gerar build do frontend${NC}"
+    exit 1
+  fi
+  
+  # Ajustar permissões
+  chmod -R 755 build
 EOF
+
+  sleep 2
 }
 
 # Configuração do ambiente frontend
@@ -683,12 +742,18 @@ frontend_env_create() {
 
   sleep 2
 
+  backend_hostname=$(echo "${backend_url/https:\/\/}")
+
 sudo su - deploy << EOF
   cat <<[-]EOF > /home/deploy/${instancia_add}/frontend/.env
 REACT_APP_BACKEND_URL=${backend_url}
+REACT_APP_BACKEND_PROTOCOL=https
+REACT_APP_BACKEND_HOST=${backend_hostname}
+REACT_APP_BACKEND_PORT=443
 REACT_APP_HOURS_CLOSE_TICKETS_AUTO=24
 REACT_APP_LOCALE=pt-br
 REACT_APP_TIMEZONE=America/Sao_Paulo
+REACT_APP_FACEBOOK_APP_ID=
 [-]EOF
 EOF
 
@@ -714,7 +779,7 @@ server {
   index index.html;
 
   location / {
-    try_files \$uri /index.html;
+      try_files \$uri /index.html;
   }
 }
 END
