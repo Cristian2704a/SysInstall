@@ -5,6 +5,45 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [2.1.0] - 2025-02-07
+
+### Adicionado
+- Campo para informar o nome do repositório a ser clonado
+- Sistema de verificação de versão do Redis após instalação
+- Verificação de status e conexão do Redis após configuração
+- Logs detalhados durante o processo de instalação do Redis
+- Verificação de instalação correta do NVM e Node.js
+
+### Alterado
+- Instalação do Node.js agora é feita via NVM (versão 20.18.0)
+- Atualizado Redis para versão 7 usando repositório oficial
+- Melhorada a configuração do PM2 startup script
+- Aprimorada a instalação de dependências para o usuário deploy
+- Otimizada a configuração do Redis com:
+  - Porta personalizada
+  - Limite de memória
+  - Política de evicção
+  - Persistência de dados
+  - Configurações de performance
+
+### Corrigido
+- Problema com NVM não disponível para o usuário deploy
+- Erro de conexão do Redis na porta configurada
+- Questão de versão antiga do Redis (atualizado para v7)
+- Problema com PM2 não persistindo após reinicialização
+- Configurações do ambiente Node.js para o usuário deploy
+
+### Segurança
+- Melhoria na configuração de bind do Redis
+- Fortalecimento das configurações de senha do Redis
+- Ajustes nas permissões de diretórios do usuário deploy
+
+### Técnico
+- Adicionado suporte ao repositório oficial do Redis
+- Implementada verificação de instalação do Node.js via NVM
+- Melhorado o processo de configuração do PM2
+- Otimizadas as configurações de ambiente para o Node.js
+
 ## [2.0.0] - 2025-02-06
 
 ### Adicionado

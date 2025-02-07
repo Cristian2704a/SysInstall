@@ -213,53 +213,131 @@ system_node_install() {
   printf "${WHITE} 💻 Instalando NVM e Node.js 20.18...${GRAY_LIGHT}"
   printf "\n\n"
 
-  # Instalar NVM
-  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-  
-  # Carregar NVM no ambiente atual
-  export NVM_DIR="$HOME/.nvm"
-  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-  [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-  
-  # Instalar Node.js 20.18
-  nvm install 20.18.0
-  nvm use 20.18.0
-  nvm alias default 20.18.0
-
-  # Atualizar NPM para a última versão
-  npm install -g npm@latest
-
-  # Adicionar NVM ao .bashrc do usuário deploy
+  # Instalar NVM e Node.js para o usuário deploy
   sudo su - deploy << EOF
-    echo 'export NVM_DIR="\$HOME/.nvm"' >> ~/.bashrc
-    echo '[ -s "\$NVM_DIR/nvm.sh" ] && \. "\$NVM_DIR/nvm.sh"' >> ~/.bashrc
-    echo '[ -s "\$NVM_DIR/bash_completion" ] && \. "\$NVM_DIR/bash_completion"' >> ~/.bashrc
-    
-    # Instalar NVM para o usuário deploy
+    # Remover instalações anteriores do NVM se existirem
+    rm -rf ~/.nvm
+
+    # Instalar NVM
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
     
-    # Carregar NVM e instalar Node.js
+    # Carregar NVM imediatamente
     export NVM_DIR="\$HOME/.nvm"
     [ -s "\$NVM_DIR/nvm.sh" ] && \. "\$NVM_DIR/nvm.sh"
+    [ -s "\$NVM_DIR/bash_completion" ] && \. "\$NVM_DIR/bash_completion"
+
+    # Configurar NVM no bashrc se ainda não estiver configurado
+    if ! grep -q "export NVM_DIR" ~/.bashrc; then
+      echo 'export NVM_DIR="\$HOME/.nvm"' >> ~/.bashrc
+      echo '[ -s "\$NVM_DIR/nvm.sh" ] && \. "\$NVM_DIR/nvm.sh"' >> ~/.bashrc
+      echo '[ -s "\$NVM_DIR/bash_completion" ] && \. "\$NVM_DIR/bash_completion"' >> ~/.bashrc
+    fi
+
+    # Recarregar o bashrc
+    source ~/.bashrc
+    
+    # Instalar Node.js
     nvm install 20.18.0
     nvm use 20.18.0
     nvm alias default 20.18.0
+    
+    # Verificar instalação
+    echo "Versão do Node.js instalada:"
+    node --version
+    echo "Versão do NPM instalada:"
+    npm --version
+    
+    # Instalar PM2 globalmente
+    npm install -g pm2
+    
+    # Verificar instalação do PM2
+    echo "Versão do PM2 instalada:"
+    pm2 --version
 EOF
+
+  # Configurar startup script do PM2
+  sudo su - root << EOF
+    # Configurar o startup script do PM2
+    env PATH=\$PATH:/home/deploy/.nvm/versions/node/v20.18.0/bin /home/deploy/.nvm/versions/node/v20.18.0/lib/node_modules/pm2/bin/pm2 startup systemd -u deploy --hp /home/deploy
+    
+    # Habilitar serviço do PM2
+    systemctl enable pm2-deploy
+EOF
+
+  # Voltar para o usuário deploy para salvar a configuração atual do PM2
+  sudo su - deploy << EOF
+    pm2 save
+EOF
+
+  sleep 2
+}
 }
 
 system_redis_install() {
   print_banner
-  printf "${WHITE} 💻 Instalando Redis...${GRAY_LIGHT}"
+  printf "${WHITE} 💻 Instalando Redis 7...${GRAY_LIGHT}"
   printf "\n\n"
 
-  sudo apt install -y redis-server
-  sudo sed -i 's/supervised no/supervised systemd/' /etc/redis/redis.conf
+  # Adicionar repositório do Redis
+  curl -fsSL https://packages.redis.io/gpg | sudo gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
+  echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/redis.list
+
+  # Atualizar e instalar Redis 7
+  sudo apt-get update
+  sudo apt-get install -y redis-server
+
+  # Verificar versão instalada
+  redis_version=$(redis-server --version | grep "Redis server" | cut -d " " -f 3)
+  printf "${WHITE} ℹ️ Versão do Redis instalada: ${redis_version}${GRAY_LIGHT}\n"
+
+  # Configurar Redis
+  sudo tee /etc/redis/redis.conf > /dev/null << EOF
+# Configurações Gerais
+port ${redis_port}
+bind 127.0.0.1
+supervised systemd
+maxmemory 2gb
+maxmemory-policy allkeys-lru
+
+# Segurança
+requirepass ${mysql_root_password}
+
+# Performance
+appendonly yes
+appendfsync everysec
+no-appendfsync-on-rewrite yes
+auto-aof-rewrite-percentage 100
+auto-aof-rewrite-min-size 64mb
+
+# Conexões
+timeout 0
+tcp-keepalive 300
+EOF
+
+  # Reiniciar o Redis
+  sudo systemctl restart redis-server
   
-  # Configurando senha do Redis
-  sudo sed -i "s/# requirepass foobared/requirepass ${mysql_root_password}/" /etc/redis/redis.conf
-  
-  sudo systemctl restart redis.service
-  sudo systemctl enable redis.service
+  # Verificar status do Redis
+  if sudo systemctl is-active --quiet redis-server; then
+    printf "${GREEN} ✅ Redis 7 instalado e configurado com sucesso na porta ${redis_port}!${NC}\n"
+    # Testar conexão
+    if redis-cli -p ${redis_port} ping > /dev/null 2>&1; then
+      printf "${GREEN} ✅ Redis respondendo na porta ${redis_port}!${NC}\n"
+    else
+      printf "${RED} ❌ Redis não está respondendo na porta ${redis_port}. Verificando logs...${NC}\n"
+      sudo tail -n 50 /var/log/redis/redis-server.log
+      exit 1
+    fi
+  else
+    printf "${RED} ❌ Erro ao iniciar o Redis. Verificando logs...${NC}\n"
+    sudo tail -n 50 /var/log/redis/redis-server.log
+    exit 1
+  fi
+
+  # Habilitar Redis para iniciar com o sistema
+  sudo systemctl enable redis-server
+
+  sleep 2
 }
 
 system_postgres_install() {
@@ -384,7 +462,7 @@ optimize_nodejs() {
   printf "${WHITE} 💻 Otimizando Node.js...${GRAY_LIGHT}"
   printf "\n\n"
 
-  export NODE_OPTIONS="--max-old-space-size=8096"
+  export NODE_OPTIONS="--max-old-space-size=4096"
   
   if command -v pm2 &> /dev/null; then
     pm2 reload all --update-env
@@ -523,10 +601,23 @@ module.exports = {
 }
 END
 
+  # Iniciar a aplicação com PM2
   cd /home/deploy/${instancia_add}/backend
   pm2 start ecosystem.config.js --env production
   pm2 save
+  
+  # Verificar se o processo está rodando
+  if pm2 show "${instancia_add}-backend" > /dev/null; then
+    printf "${GREEN} ✅ Serviço do backend iniciado com sucesso!${NC}"
+  else
+    printf "${RED} ❌ Erro ao iniciar o serviço do backend. Verificando logs...${NC}"
+    pm2 logs "${instancia_add}-backend" --lines 100
+    exit 1
+  fi
 EOF
+
+  sleep 2
+}
 }
 
 # Configuração do Nginx para o backend
