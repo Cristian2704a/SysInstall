@@ -7,9 +7,9 @@ Este é o instalador oficial do AutoAtende, uma plataforma SaaS para gestão de 
 | Componente | Mínimo | Recomendado |
 |------------|---------|-------------|
 | CPU | 2 cores | 4 cores |
-| Memória RAM | 4GB | 8GB ou mais |
-| Armazenamento | 20GB | 40GB ou mais |
-| Sistema Operacional | Ubuntu 20.04 | Ubuntu 22.04 |
+| Memória RAM | 8GB | 32GB ou mais |
+| Armazenamento | 20GB | 100GB ou mais |
+| Sistema Operacional | Ubuntu 20.04 | Ubuntu 24.04 |
 
 ## 📋 Pré-requisitos
 
