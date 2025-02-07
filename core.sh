@@ -192,33 +192,60 @@ remove_complete_system() {
   printf "${WHITE} 🗑️ Removendo sistema...${GRAY_LIGHT}"
   printf "\n\n"
 
-  # Parar todos os serviços do PM2
-  sudo su - deploy << EOF
+  # Logging detalhado de cada operação
+  echo "=== Iniciando remoção completa do sistema em $(date) ===" | tee -a "$LOG_FILE"
+
+  # Parar e remover serviços PM2
+  echo "Parando serviços PM2..." | tee -a "$LOG_FILE"
+  sudo su - deploy << EOF 2>&1 | tee -a "$LOG_FILE"
+    pm2 list
     pm2 kill
     pm2 save
+    pm2 unstartup systemd
+EOF
+
+  # Listar e remover instâncias
+  echo "Listando instâncias antes da remoção..." | tee -a "$LOG_FILE"
+  ls -la /home/deploy/ 2>&1 | tee -a "$LOG_FILE"
+
+  # Remover bancos de dados PostgreSQL
+  echo "Removendo bancos de dados PostgreSQL..." | tee -a "$LOG_FILE"
+  sudo su - postgres << EOF 2>&1 | tee -a "$LOG_FILE"
+    psql -l
+    for db in \$(psql -t -c "SELECT datname FROM pg_database WHERE datistemplate = false AND datname != 'postgres';"); do
+      echo "Removendo banco \$db"
+      dropdb "\$db"
+    done
 EOF
 
   # Remover usuário deploy e seus arquivos
-  sudo deluser deploy
-  sudo rm -rf /home/deploy
+  echo "Removendo usuário deploy e arquivos..." | tee -a "$LOG_FILE"
+  sudo pkill -u deploy 2>&1 | tee -a "$LOG_FILE"
+  sudo deluser --remove-home deploy 2>&1 | tee -a "$LOG_FILE"
 
   # Remover pacotes do sistema
-  sudo apt remove -y nginx postgresql redis-server
-  sudo apt autoremove -y
+  echo "Removendo pacotes do sistema..." | tee -a "$LOG_FILE"
+  sudo apt remove --purge -y nginx postgresql redis-server 2>&1 | tee -a "$LOG_FILE"
+  sudo apt autoremove -y 2>&1 | tee -a "$LOG_FILE"
 
   # Remover configurações
-  sudo rm -rf /etc/nginx/sites-enabled/*
-  sudo rm -rf /etc/nginx/sites-available/*
-  sudo rm -rf /etc/postgresql
-  sudo rm -rf /etc/redis
+  echo "Removendo arquivos de configuração..." | tee -a "$LOG_FILE"
+  sudo rm -rf /etc/nginx/sites-enabled/* 2>&1 | tee -a "$LOG_FILE"
+  sudo rm -rf /etc/nginx/sites-available/* 2>&1 | tee -a "$LOG_FILE"
+  sudo rm -rf /etc/postgresql 2>&1 | tee -a "$LOG_FILE"
+  sudo rm -rf /etc/redis 2>&1 | tee -a "$LOG_FILE"
+  sudo rm -rf /var/lib/postgresql 2>&1 | tee -a "$LOG_FILE"
+  sudo rm -rf /var/lib/redis 2>&1 | tee -a "$LOG_FILE"
+
+  echo "=== Remoção do sistema concluída em $(date) ===" | tee -a "$LOG_FILE"
 
   print_banner
   printf "${GREEN} ✅ Sistema removido com sucesso!${NC}"
-  printf "${GREEN} ℹ️ Para reinstalar, use a opção 'Instalação Primária'${NC}"
+  printf "\n${GREEN} ℹ️ Log completo disponível em: ${LOG_FILE}${NC}"
+  printf "\n${GREEN} ℹ️ Para reinstalar, use a opção 'Instalação Primária'${NC}"
   printf "\n\n"
   sleep 2
 }
-
 # Funções de sistema
 system_update() {
   print_banner
@@ -237,8 +264,13 @@ system_create_user() {
   printf "${WHITE} 💻 Criando usuário deploy...${GRAY_LIGHT}"
   printf "\n\n"
 
-  sudo useradd -m -p $(openssl passwd -6 ${mysql_root_password}) -s /bin/bash -G sudo deploy
-  sudo usermod -aG sudo deploy
+  # Criar usuário deploy
+  useradd -m -p $(openssl passwd -6 ${mysql_root_password}) -s /bin/bash -G sudo deploy
+  usermod -aG sudo deploy
+  
+  # Adicionar usuário www-data ao grupo deploy e vice-versa
+  usermod -aG www-data deploy
+  usermod -aG deploy www-data
 
   # Configurar NVM no bashrc do usuário deploy
   sudo su - deploy << EOF
