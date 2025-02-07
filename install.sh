@@ -308,7 +308,7 @@ EOF
 
   sleep 2
 }
-}
+
 
 system_redis_install() {
   print_banner
