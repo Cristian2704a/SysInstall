@@ -262,23 +262,28 @@ system_create_user() {
     print_banner
     log_message "Criando usuário deploy"
     
-    # Criar usuário
-    useradd -m -p $(openssl passwd -6 ${mysql_root_password}) -s /bin/bash -G sudo deploy
+    # Remover usuário se já existir
+    if id "deploy" >/dev/null 2>&1; then
+        userdel -rf deploy
+    fi
+
+    # Criar usuário corretamente
+    useradd -m -p $(openssl passwd -6 ${mysql_root_password}) -s /bin/bash deploy
+    
+    # Configurar grupos e permissões
     usermod -aG sudo deploy
     usermod -aG www-data deploy
-    usermod -aG deploy www-data
-
-    # Criar diretórios necessários
-    sudo mkdir -p /home/deploy/.pm2
-    sudo chown -R deploy:deploy /home/deploy/.pm2
-    sudo chmod -R 775 /home/deploy/.pm2
-
-    sudo su - deploy << EOF
-        mkdir -p ~/.pm2
-        echo 'export NVM_DIR="\$HOME/.nvm"' >> ~/.bashrc
-        echo '[ -s "\$NVM_DIR/nvm.sh" ] && \. "\$NVM_DIR/nvm.sh"' >> ~/.bashrc
-        echo '[ -s "\$NVM_DIR/bash_completion" ] && \. "\$NVM_DIR/bash_completion"' >> ~/.bashrc
-EOF
+    
+    # Criar e configurar diretórios necessários
+    mkdir -p /home/deploy/.pm2
+    mkdir -p /home/deploy/.nvm
+    chown -R deploy:deploy /home/deploy
+    chmod -R 775 /home/deploy
+    
+    # Configurar bashrc com permissões corretas
+    su - deploy -c "touch /home/deploy/.bashrc"
+    su - deploy -c "echo 'export NVM_DIR=\"\$HOME/.nvm\"' >> /home/deploy/.bashrc"
+    su - deploy -c "echo '[ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\"' >> /home/deploy/.bashrc"
 }
 
 setup_firewall() {
@@ -330,43 +335,50 @@ system_redis_install() {
     print_banner
     log_message "Instalando Redis"
 
-    # Adicionar repositório do Redis
-    curl -fsSL https://packages.redis.io/gpg | sudo gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
-    echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/redis.list
+    # Remover instalação anterior se existir
+    systemctl stop redis-server || true
+    apt remove --purge -y redis-server redis-tools || true
+    rm -rf /etc/redis
 
-    sudo apt-get update
-    sudo apt-get install -y redis-server
+    # Instalar Redis limpo
+    curl -fsSL https://packages.redis.io/gpg | gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
+    echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/redis.list
+    apt-get update
+    apt-get install -y redis-server
+
+    # Configurar com permissões corretas
+    mkdir -p /etc/redis
+    chown -R redis:redis /etc/redis
 
     # Configurar Redis
-    sudo tee /etc/redis/redis.conf > /dev/null << EOF
+    cat > /etc/redis/redis.conf << EOF
 port ${redis_port}
 bind 127.0.0.1
-supervised systemd
 maxmemory 2gb
 maxmemory-policy allkeys-lru
 requirepass ${mysql_root_password}
-appendonly yes
-appendfsync everysec
-no-appendfsync-on-rewrite yes
-auto-aof-rewrite-percentage 100
-auto-aof-rewrite-min-size 64mb
 EOF
 
-    sudo systemctl restart redis-server
-    sudo systemctl enable redis-server
+    # Reiniciar serviço
+    systemctl enable redis-server
+    systemctl restart redis-server
 }
 
 system_postgres_install() {
     print_banner
     log_message "Instalando PostgreSQL"
 
-    sudo apt install -y postgresql-common
-    sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
-    sudo apt update
-    sudo apt install -y postgresql-16 postgresql-client-16
+    # Adicionar chave GPG corretamente
+    curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/pgdg.gpg
     
-    sudo systemctl start postgresql
-    sudo systemctl enable postgresql
+    echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+    
+    apt-get update
+    apt-get install -y postgresql-16 postgresql-client-16
+
+    # Iniciar serviço
+    systemctl enable postgresql
+    systemctl start postgresql
 }
 
 system_nginx_install() {
@@ -737,17 +749,27 @@ install_autoatende() {
     local installation_type=$1
 
     if [[ $installation_type == "primary" ]]; then
+        # Primeiro atualizar sistema e criar usuário
         system_update
-        system_create_user        
-        system_node_install      
-        system_redis_install
+        system_create_user
+        
+        # Depois instalar serviços
         system_postgres_install
+        system_redis_install
         system_nginx_install
         system_certbot_install
+        
+        # Por último, configurar Node.js e PM2
+        system_node_install
         setup_firewall
     fi
 
-    # Clone do repositório
+    # Criar diretório do projeto com permissões corretas
+    mkdir -p /home/deploy/${instancia_add}
+    chown -R deploy:deploy /home/deploy/${instancia_add}
+    chmod -R 775 /home/deploy/${instancia_add}
+
+    # Clone do repositório como usuário deploy
     sudo su - deploy <<EOF
         git clone -b main https://lucassaud:${token_code}@github.com/AutoAtende/Sys.git /home/deploy/${instancia_add}
 EOF
