@@ -1,26 +1,15 @@
 #!/bin/bash
 
-backend_redis_create() {
+backend_redis_setup() {
   print_banner
-  printf "${WHITE} 💻 Criando Redis & Banco Postgres...${GRAY_LIGHT}"
+  printf "${WHITE} 💻 Configurando Redis para o backend...${GRAY_LIGHT}"
   printf "\n\n"
-
   sleep 2
-
-  sudo su - root <<EOF
-  usermod -aG docker deploy
-  docker run --name redis-${instancia_add} -p ${redis_port}:6379 --restart always -v redis-data-${instancia_add}:/data --detach redis:latest redis-server --requirepass ${mysql_root_password} --maxmemory 2gb --maxmemory-policy noeviction
-  sudo su - postgres
-  createdb ${instancia_add};
-  psql
-  CREATE USER ${instancia_add} SUPERUSER INHERIT CREATEDB CREATEROLE;
-  ALTER USER ${instancia_add} PASSWORD '${mysql_root_password}';
-  \q
-  exit
-EOF
-
-sleep 2
-
+  
+  # Verificando se o Redis está rodando
+  sudo systemctl status redis-server --no-pager
+  
+  sleep 2
 }
 
 backend_set_env() {
@@ -73,8 +62,6 @@ backend_node_dependencies() {
   print_banner
   printf "${WHITE} 💻 Instalando dependências do backend...${GRAY_LIGHT}"
   printf "\n\n"
-
-
   sleep 2
 
 sudo su - deploy <<EOF
@@ -102,7 +89,12 @@ chmod 777 public/company1/profile
 npm install
 EOF
 
-  printf "${GREEN}Instalação das dependências concluída com sucesso!\n"
+  # Ajustando permissões para o nginx acessar os arquivos
+  sudo su - root <<EOF
+  chown -R deploy:www-data /home/deploy/${instancia_add}/backend/public
+  chmod -R 775 /home/deploy/${instancia_add}/backend/public
+  usermod -a -G deploy www-data
+EOF
 
   sleep 2
 }
@@ -111,16 +103,13 @@ backend_node_build() {
   print_banner
   printf "${WHITE} 💻 Compilando o código do backend...${GRAY_LIGHT}"
   printf "\n\n"
-
   sleep 2
-
 sudo su - deploy <<EOF
 cd /home/deploy/${instancia_add}/backend
 npm run build
 cp .env dist/
 rm -rf src
 EOF
-
   sleep 2
 }
 
@@ -128,29 +117,20 @@ backend_db_migrate() {
   print_banner
   printf "${WHITE} 💻 Executando db:migrate...${GRAY_LIGHT}"
   printf "\n\n"
-
   sleep 2
-
-sudo su - deploy <<EOF
-cd /home/deploy/${instancia_add}/backend
-npx sequelize db:migrate
-npx sequelize db:migrate
-npx sequelize db:migrate
+  
+  # Criando banco e usuário
+  sudo su - postgres <<EOF
+createdb ${instancia_add}
+psql -c "CREATE USER ${instancia_add} WITH ENCRYPTED PASSWORD '${mysql_root_password}' SUPERUSER INHERIT CREATEDB CREATEROLE;"
+psql -c "ALTER DATABASE ${instancia_add} OWNER TO ${instancia_add};"
 EOF
 
-  sleep 2
-}
-
-backend_redis_setup() {
-  print_banner
-  printf "${WHITE} 💻 Configurando Redis para o backend...${GRAY_LIGHT}"
-  printf "\n\n"
-  sleep 2
-  
-  # As configurações já foram feitas na instalação do Redis
-  # Apenas verificando se o serviço está rodando
-  sudo systemctl status redis-server --no-pager
-  
+  # Executando migrations
+  sudo su - deploy <<EOF
+cd /home/deploy/${instancia_add}/backend
+npx sequelize db:migrate
+EOF
   sleep 2
 }
 
@@ -158,14 +138,11 @@ backend_db_seed() {
   print_banner
   printf "${WHITE} 💻 Executando db:seed...${GRAY_LIGHT}"
   printf "\n\n"
-
   sleep 2
-
 sudo su - deploy <<EOF
 cd /home/deploy/${instancia_add}/backend
 npx sequelize db:seed:all
 EOF
-
   sleep 2
 }
 
@@ -174,8 +151,6 @@ backend_start_pm2() {
   printf "${WHITE} 💻 Iniciando pm2 (backend)...${GRAY_LIGHT}"
   printf "\n\n"
   sleep 2
-
-  # Criar o arquivo de configuração do PM2
   sudo su - deploy << EOF
   cat > /home/deploy/${instancia_add}/backend/ecosystem.config.js << 'END'
 module.exports = {
@@ -196,21 +171,10 @@ module.exports = {
   }]
 }
 END
-
-EOF
-
-  # Configurar PM2 startup
-  sudo su - root << EOF
-pm2 startup
-sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u deploy --hp /home/deploy
-EOF
-
-  # Iniciar a aplicação usando o arquivo de configuração
-  sudo su - deploy << EOF
 cd /home/deploy/${instancia_add}/backend
-NODE_ENV=production pm2 start ecosystem.config.js --update-env
+pm2 start ecosystem.config.js
+pm2 save
 EOF
-
   sleep 2
 }
 
@@ -218,11 +182,8 @@ backend_nginx_setup() {
   print_banner
   printf "${WHITE} 💻 Configurando nginx (backend)...${GRAY_LIGHT}"
   printf "\n\n"
-
   sleep 2
-
   backend_hostname=$(echo "${backend_url/https:\/\/}")
-
 sudo su - root << EOF
 cat > /etc/nginx/sites-available/${instancia_add}-backend << 'END'
 server {
@@ -238,16 +199,12 @@ server {
     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     proxy_cache_bypass \$http_upgrade;
   }
-
-  # BLoquear solicitacoes de arquivos do GitHub
   location ~ /\.git {
     deny all;
   }
-
 }
 END
 ln -s /etc/nginx/sites-available/${instancia_add}-backend /etc/nginx/sites-enabled
 EOF
-
   sleep 2
 }

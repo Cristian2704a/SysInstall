@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# reset shell colors
 tput init
 
 SOURCE="${BASH_SOURCE[0]}"
@@ -42,6 +41,7 @@ inquiry_options
 system_update
 system_node_install
 system_redis_install
+system_pm2_install
 system_fail2ban_install
 system_fail2ban_conf
 system_firewall_conf
@@ -63,10 +63,7 @@ backend_start_pm2
 backend_nginx_setup
 
 # frontend related
-frontend_set_env
-frontend_node_dependencies
-frontend_node_build
-frontend_nginx_setup
+frontend_setup
 
 # network related
 system_nginx_conf
@@ -87,9 +84,9 @@ printf "${WHITE} Guarde estas informações em um local seguro!${GRAY_LIGHT}"
 printf "\n\n"
 printf "${WHITE} Para acessar o sistema, utilize:${GRAY_LIGHT}"
 printf "\n"
-printf "${WHITE} Usuário: ${GRAY_LIGHT}admin@autoatende.com"
+printf "${WHITE} Usuário: ${GRAY_LIGHT}admin@autoatende.com.br"
 printf "\n"
-printf "${WHITE} Senha: ${GRAY_LIGHT}mudar@123"
+printf "${WHITE} Senha: ${GRAY_LIGHT}123456"
 printf "\n\n"
 printf "${RED} ⚠️ IMPORTANTE: Altere a senha padrão após o primeiro acesso!${GRAY_LIGHT}"
 printf "\n\n"

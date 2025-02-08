@@ -1,47 +1,66 @@
 #!/bin/bash
-# 
-# functions for setting up app frontend
 
-#######################################
-# installed node packages
-# Arguments:
-#   None
-#######################################
+frontend_create_manifest() {
+  print_banner
+  printf "${WHITE} 💻 Criando manifest.json...${GRAY_LIGHT}"
+  printf "\n\n"
+  sleep 2
+
+sudo su - deploy << EOF
+  cat > /home/deploy/${instancia_add}/frontend/public/manifest.json << MANIFESTEOF
+{
+  "short_name": "${empresa_nome}",
+  "name": "${empresa_nome}",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff"
+}
+MANIFESTEOF
+EOF
+  sleep 2
+}
+
 frontend_node_dependencies() {
   print_banner
   printf "${WHITE} 💻 Instalando dependências do frontend...${GRAY_LIGHT}"
   printf "\n\n"
-
   sleep 2
-
   sudo su - deploy <<EOF
   cd /home/deploy/${instancia_add}/frontend
   npm install --legacy-peer-deps
 EOF
-
   sleep 2
 }
 
-#######################################
-# compiles frontend code
-# Arguments:
-#   None
-#######################################
 frontend_node_build() {
   print_banner
   printf "${WHITE} 💻 Compilando o código do frontend...${GRAY_LIGHT}"
   printf "\n\n"
-
   sleep 2
-
 sudo su - deploy <<EOF
   cd /home/deploy/${instancia_add}/frontend
   npm run build
   rm -rf src
 EOF
-
   sleep 2
-
 }
 
 #######################################
@@ -113,4 +132,12 @@ ln -s /etc/nginx/sites-available/${instancia_add}-frontend /etc/nginx/sites-enab
 EOF
 
   sleep 2
+}
+
+frontend_setup() {
+  frontend_set_env
+  frontend_create_manifest
+  frontend_node_dependencies
+  frontend_node_build
+  frontend_nginx_setup
 }
