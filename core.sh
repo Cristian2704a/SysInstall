@@ -69,13 +69,6 @@ get_pwa_name() {
   read -p "> " pwa_name
 }
 
-get_instancia_add() {
-  print_banner
-  printf "${WHITE} 💻 Informe um nome para a Instancia/Empresa (Letras minúsculas, sem espaços/caracteres especiais):${GRAY_LIGHT}"
-  printf "\n\n"
-  read -p "> " instancia_add
-}
-
 get_frontend_url() {
   print_banner
   printf "${WHITE} 💻 Digite o domínio do FRONTEND/PAINEL para a ${instancia_add}:${GRAY_LIGHT}"
@@ -90,21 +83,14 @@ get_backend_url() {
   read -p "> " backend_url
 }
 
-get_backend_port() {
-  print_banner
-  printf "${WHITE} 💻 Digite a porta do BACKEND para esta instancia (Ex: 4000 A 4999):${GRAY_LIGHT}"
-  printf "\n\n"
-  read -p "> " backend_port
-}
+
 
 # Função principal de coleta de dados
 get_urls() {
   get_mysql_root_password
   get_token_code
-  get_instancia_add
   get_frontend_url
   get_backend_url
-  get_backend_port
   get_pwa_name
   
   # Definir valores padrão
@@ -112,6 +98,9 @@ get_urls() {
   repo_name="Sys"
   max_whats=250
   max_user=500
+  backend_port=4001
+  instancia_add=autoatende
+
 }
 
 # Função de remoção de instância
@@ -338,33 +327,68 @@ system_redis_install() {
     print_banner
     log_message "Instalando Redis"
 
-    # Remover instalação anterior se existir
+    # Remover instalação anterior completamente
+    log_message "Removendo instalação anterior do Redis..."
     systemctl stop redis-server || true
-    apt remove --purge -y redis-server redis-tools || true
-    rm -rf /etc/redis
+    systemctl disable redis-server || true
+    apt-get remove --purge -y redis-server redis-tools || true
+    apt-get autoremove -y
+    rm -rf /etc/redis /var/lib/redis
+    
+    # Limpar arquivos de configuração anteriores
+    rm -f /etc/apt/sources.list.d/redis.list
+    rm -f /usr/share/keyrings/redis-archive-keyring.gpg
 
-    # Instalar Redis limpo
+    # Adicionar repositório Redis
+    log_message "Configurando repositório Redis..."
     curl -fsSL https://packages.redis.io/gpg | gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
     echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/redis.list
+    
+    # Atualizar e instalar
     apt-get update
-    apt-get install -y redis-server
+    apt-get install -y redis-server redis-tools
 
-    # Configurar com permissões corretas
-    mkdir -p /etc/redis
-    chown -R redis:redis /etc/redis
+    # Configurar Redis com verificações
+    log_message "Configurando Redis..."
+    install -d -m 755 /etc/redis
+    
+    # Backup da configuração original se existir
+    if [ -f /etc/redis/redis.conf ]; then
+        cp /etc/redis/redis.conf /etc/redis/redis.conf.bak
+    fi
 
-    # Configurar Redis
+    # Criar nova configuração
     cat > /etc/redis/redis.conf << EOF
 port ${redis_port}
 bind 127.0.0.1
 maxmemory 2gb
 maxmemory-policy allkeys-lru
 requirepass ${mysql_root_password}
+dir /var/lib/redis
+pidfile /var/run/redis/redis-server.pid
+logfile /var/log/redis/redis-server.log
 EOF
 
+    # Configurar permissões corretas
+    chown -R redis:redis /etc/redis
+    chmod 644 /etc/redis/redis.conf
+    
+    # Garantir diretórios necessários
+    install -d -m 755 -o redis -g redis /var/lib/redis
+    install -d -m 755 -o redis -g redis /var/log/redis
+
     # Reiniciar serviço
+    log_message "Reiniciando serviço Redis..."
+    systemctl daemon-reload
     systemctl enable redis-server
     systemctl restart redis-server
+    
+    # Verificar status
+    if ! systemctl is-active --quiet redis-server; then
+        handle_error "Falha ao iniciar Redis. Verifique os logs com: journalctl -u redis-server"
+    fi
+    
+    log_message "Redis instalado e configurado com sucesso"
 }
 
 system_postgres_install() {
