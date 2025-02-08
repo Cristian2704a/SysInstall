@@ -261,12 +261,20 @@ system_update() {
 system_create_user() {
     print_banner
     log_message "Criando usuário deploy"
+    
+    # Criar usuário
     useradd -m -p $(openssl passwd -6 ${mysql_root_password}) -s /bin/bash -G sudo deploy
     usermod -aG sudo deploy
     usermod -aG www-data deploy
     usermod -aG deploy www-data
 
+    # Criar diretórios necessários
+    sudo mkdir -p /home/deploy/.pm2
+    sudo chown -R deploy:deploy /home/deploy/.pm2
+    sudo chmod -R 775 /home/deploy/.pm2
+
     sudo su - deploy << EOF
+        mkdir -p ~/.pm2
         echo 'export NVM_DIR="\$HOME/.nvm"' >> ~/.bashrc
         echo '[ -s "\$NVM_DIR/nvm.sh" ] && \. "\$NVM_DIR/nvm.sh"' >> ~/.bashrc
         echo '[ -s "\$NVM_DIR/bash_completion" ] && \. "\$NVM_DIR/bash_completion"' >> ~/.bashrc
@@ -730,13 +738,13 @@ install_autoatende() {
 
     if [[ $installation_type == "primary" ]]; then
         system_update
-        system_node_install
+        system_create_user        
+        system_node_install      
         system_redis_install
         system_postgres_install
         system_nginx_install
         system_certbot_install
         setup_firewall
-        system_create_user
     fi
 
     # Clone do repositório
