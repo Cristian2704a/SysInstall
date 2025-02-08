@@ -6,33 +6,33 @@ setup_logging() {
     LOG_FILE="$LOG_DIR/install_$(date +%Y%m%d_%H%M%S).log"
     mkdir -p $LOG_DIR
     
-    # Criar função para logging limpo
+    # Função para logging limpo
     log_message() {
         echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
     }
     
-    # Redirecionar stdout e stderr para o arquivo de log e console
+    # Redirecionar stdout e stderr para arquivo de log e console
     exec 1> >(while read -r line; do
-        if [[ $line =~ ^\s*\x1B\[[0-9;]*[mK] ]]; then
-            # Remove códigos de cores ANSI e mantém apenas o texto limpo
-            clean_line=$(echo "$line" | sed 's/\x1B\[[0-9;]*[mK]//g')
-            if [[ $clean_line =~ ^[[:space:]]*💻[[:space:]]*(.*) ]]; then
-                echo "$(date '+%Y-%m-%d %H:%M:%S') - ${BASH_REMATCH[1]}" >> "$LOG_FILE"
-            else
-                echo "$clean_line" >> "$LOG_FILE"
-            fi
+        # Remove códigos de cores ANSI e processa a linha
+        cleaned_line=$(echo "$line" | sed 's/\x1B\[[0-9;]*[[:alpha:]]//g')
+        
+        if [[ $cleaned_line =~ 💻[[:space:]]+(.*) ]]; then
+            # Se a linha começa com emoji, registra apenas o texto após ele
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - ${BASH_REMATCH[1]}" >> "$LOG_FILE"
         else
-            echo "$line" >> "$LOG_FILE"
+            # Caso contrário, registra a linha completa limpa
+            [[ ! -z "$cleaned_line" ]] && echo "$cleaned_line" >> "$LOG_FILE"
         fi
+        # Exibe a linha original no console
         echo "$line"
     done)
     
+    # Redirecionar stderr para arquivo de log e console
     exec 2> >(while read -r line; do
         echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: $line" | tee -a "$LOG_FILE"
     done)
 
     log_message "=== Iniciando instalação do AutoAtende ==="
-    log_message "Tipo de instalação: $1"
 }
 
 # Função para imprimir mensagens no log
