@@ -11,9 +11,6 @@ while [ -h "$SOURCE" ]; do
 done
 PROJECT_ROOT="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
 
-# Incluir o arquivo de funções
-source "${PROJECT_ROOT}/core.sh"
-
 # Definição das cores
 RED="\033[1;31m"
 GREEN="\033[1;32m"
@@ -24,9 +21,29 @@ GRAY_LIGHT="\033[0;37m"
 CYAN_LIGHT="\033[1;36m"
 NC="\033[0m"
 
+# Incluir o arquivo de funções
+source "${PROJECT_ROOT}/core.sh"
+
+# Função para remover software
+software_delete() {
+  printf "${WHITE} 💻 Selecione o tipo de remoção:${GRAY_LIGHT}"
+  printf "\n\n"
+  printf "   [1] Remover uma instância\n"
+  printf "   [2] Remover sistema por completo\n"
+  printf "   [3] Voltar\n"
+  printf "\n"
+  read -p "> " delete_type
+
+  case "${delete_type}" in
+    1) remove_instance ;;
+    2) remove_complete_system ;;
+    3) show_system_menu ;;
+    *) echo "Opção inválida" && sleep 2 && software_delete ;;
+  esac
+}
+
 # Menu principal
 get_install_type() {
-  
   printf "${WHITE} 💻 Selecione o tipo de instalação:${GRAY_LIGHT}"
   printf "\n\n"
   printf "   [1] Instalação Primária (Primeira instalação no servidor)\n"
@@ -48,7 +65,6 @@ show_system_menu() {
   local installation_type=$1
   
   while true; do
-    
     printf "${WHITE} 💻 Selecione a ação desejada:${GRAY_LIGHT}"
     printf "\n\n"
     printf "   [1] Instalar AutoAtende\n"
@@ -59,9 +75,17 @@ show_system_menu() {
     read -p "> " option
 
     case "${option}" in
-      1) get_urls && install_autoatende $installation_type && break ;;
+      1) 
+        get_urls
+        if [ $? -eq 0 ]; then
+          install_autoatende "$installation_type"
+          if [ $? -eq 0 ]; then
+            break
+          fi
+        fi
+        ;;
       2) software_delete && break ;;
-      3) optimize_system && show_system_menu $installation_type ;;
+      3) optimize_system && show_system_menu "$installation_type" ;;
       4) get_install_type && break ;;
       *) echo "Opção inválida" && sleep 2 ;;
     esac
