@@ -1,98 +1,105 @@
-# AutoAtende - Instalador
+# AutoAtende Installer
 
-Este é o instalador oficial do AutoAtende, uma plataforma SaaS de atendimento multicanal.
+Este é o instalador oficial do AutoAtende, uma plataforma SaaS para gestão de atendimento e automação de WhatsApp.
 
-## Requisitos do Sistema
+## 🚀 Requisitos do Sistema
 
-- Ubuntu 20.04 LTS ou superior
-- Mínimo de 2GB de RAM
-- 2 vCPUs
-- 40GB de armazenamento
+| Componente | Mínimo | Recomendado |
+|------------|---------|-------------|
+| CPU | 2 cores | 4 cores |
+| Memória RAM | 8GB | 32GB ou mais |
+| Armazenamento | 20GB | 100GB ou mais |
+| Sistema Operacional | Ubuntu 20.04 | Ubuntu 24.04 |
+
+## 📋 Pré-requisitos
+
+- Acesso root ao servidor
 - Domínios configurados para frontend e backend
+- Token de acesso ao repositório do AutoAtende
+- Nome do repositório a ser instalado
 
-## Tecnologias Utilizadas
-
-- Node.js 20.x
-- PostgreSQL 16
-- Redis
-- Nginx
-- PM2
-- Certbot (Let's Encrypt)
-- Fail2ban
-
-## Pré-requisitos
-
-1. Um servidor Ubuntu limpo (recomendamos uma nova instalação)
-2. Dois domínios configurados apontando para o IP do seu servidor:
-   - Um para o frontend (ex: painel.seudominio.com.br)
-   - Um para o backend (ex: api.seudominio.com.br)
-3. Token de acesso ao repositório
-
-## Instalação
-
-1. Faça login no seu servidor via SSH
-2. Execute o comando abaixo:
+## 💻 Instalação Rápida
 
 ```bash
-wget https://raw.githubusercontent.com/AutoAtende/instalador/main/install.sh && sudo chmod +x install.sh && ./install.sh
+# Download e execução do instalador
+sudo apt install -y git && git clone https://github.com/AutoAtende/SysInstall.git autoatende && sudo chmod -R 777 ./autoatende && cd ./autoatende && sudo ./install.sh
 ```
 
-3. Siga as instruções na tela para configurar sua instância
+## 🛠️ O que o instalador faz?
 
-## Informações Solicitadas Durante a Instalação
+1. **Instalação Primária**
+   - Configura todo o ambiente necessário
+   - Instala e configura:
+     - Node.js 20.18.0 (via NVM)
+     - PostgreSQL 16
+     - Redis 7
+     - Nginx
+     - Certbot (Let's Encrypt)
+   - Configura firewall (UFW)
+   - Cria usuário deploy
 
-- Senha para o usuário deploy e banco de dados
-- Token de acesso ao repositório
-- Nome da instância (apenas letras minúsculas sem espaços)
-- Nome da empresa para o PWA
-- Domínio do frontend
-- Domínio do backend
+2. **Instalação de Instância**
+   - Clona o repositório específico
+   - Configura banco de dados
+   - Configura variáveis de ambiente
+   - Instala dependências
+   - Configura nginx
+   - Configura SSL
 
-## Primeiro Acesso
+3. **Otimização do Sistema**
+   - Otimiza PostgreSQL
+   - Otimiza Redis
+   - Otimiza Nginx
+   - Otimiza Node.js
 
-Após a instalação, acesse o frontend através do domínio configurado e utilize as credenciais:
+## 📝 Opções do Menu
 
-- Email: admin@autoatende.com.br
-- Senha: 123456
+1. **Menu Principal**
+   - Instalar
+   - Desistalar
+   - Sair
 
-**IMPORTANTE:** Altere a senha padrão após o primeiro acesso!
+## 📊 Portas Utilizadas
 
-## Recursos Instalados
+| Porta | Serviço |
+|-------|---------|
+| 22 | SSH |
+| 80 | HTTP |
+| 443 | HTTPS |
+| 5432 | PostgreSQL |
+| 6379 | Redis |
+| 3000 | Frontend (desenvolvimento) |
+| 8080 | Backend (desenvolvimento) |
 
-- Backend (Node.js + PostgreSQL)
-- Frontend (React)
-- Redis para cache e filas
-- Nginx como proxy reverso
-- Certificados SSL automáticos
-- PM2 para gerenciamento de processos
-- Fail2ban para segurança
 
-## Estrutura de Diretórios
+## ⚙️ Configurações Padrão
 
-```
-/home/deploy/[instancia]/
-├── backend/
-│   ├── dist/
-│   ├── public/
-│   └── logs/
-└── frontend/
-    └── build/
-```
+- PostgreSQL: Configurado para performance otimizada
+- Redis: Configurado com senha e limites de memória
+- Nginx: Otimizado para melhor performance
+- PM2: Configurado para gerenciamento de processos Node.js
 
-## Segurança
+## 🛟 Suporte
 
-O instalador configura automaticamente:
+Para suporte, entre em contato através do nosso canal oficial: [Suporte AutoAtende](lucas@autoatende.com)
 
-- Firewall (UFW)
-- Fail2ban
-- Certificados SSL
-- Senhas seguras para Redis e PostgreSQL
-- Permissões de arquivos e diretórios
+## 🔒 Segurança
 
-## Suporte
+- Firewall configurado com regras restritas
+- Senhas geradas de forma segura
+- Proteção contra acessos indevidos
+- SSL/TLS via Let's Encrypt
 
-Para suporte, entre em contato através dos canais oficiais do AutoAtende.
+## 🤝 Contribuindo
 
-## Licença
+Para contribuir com este projeto:
 
-Este software é proprietário. Todos os direitos reservados.
+1. Faça um fork do projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
+3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
+4. Push para a branch (`git push origin feature/AmazingFeature`)
+5. Abra um Pull Request
+
+## 📜 Licença
+
+Este projeto está sob a licença [MIT](https://opensource.org/licenses/MIT).
