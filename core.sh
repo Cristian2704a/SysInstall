@@ -157,91 +157,86 @@ remove_complete_system() {
 
     log_message "Iniciando remoção completa do sistema"
 
-    # 1. Parar todos os serviços primeiro
-    log_message "Parando serviços..."
-    sudo systemctl stop nginx
-    sudo systemctl stop redis-server
-    sudo systemctl stop postgresql
-    
-    # 2. Remover PM2 e suas configurações
-    log_message "Removendo PM2..."
-    sudo su - deploy << EOF 2>/dev/null
-        pm2 delete all
-        pm2 kill
-        pm2 unstartup systemd
-EOF
-    sudo npm remove -g pm2
-    sudo rm -rf /usr/lib/node_modules/pm2
-    sudo rm -f /etc/systemd/system/pm2-*
-    sudo rm -rf /root/.pm2
+    # 1. Parar todos os processos PM2 primeiro
+    log_message "Parando processos PM2..."
+    if id "deploy" >/dev/null 2>&1; then
+        sudo -u deploy bash -c 'pm2 delete all 2>/dev/null || true'
+        sudo -u deploy bash -c 'pm2 kill 2>/dev/null || true'
+    fi
+    sudo npm remove -g pm2 2>/dev/null || true
 
-    # 3. Remover usuário deploy e seus arquivos
+    # 2. Parar e desabilitar serviços
+    log_message "Parando serviços..."
+    for service in nginx redis-server postgresql; do
+        sudo systemctl stop $service 2>/dev/null || true
+        sudo systemctl disable $service 2>/dev/null || true
+    done
+
+    # 3. Remover bancos de dados PostgreSQL
+    log_message "Removendo bancos PostgreSQL..."
+    if id "postgres" >/dev/null 2>&1; then
+        sudo -i -u postgres psql -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname != 'postgres';" 2>/dev/null || true
+        sudo -i -u postgres psql -c "\l" | grep -v "template0\|template1\|postgres" | awk '{print $1}' | while read db; do
+            if [ ! -z "$db" ]; then
+                sudo -i -u postgres dropdb "$db" 2>/dev/null || true
+            fi
+        done
+    fi
+
+    # 4. Remover usuário deploy com força
     log_message "Removendo usuário deploy..."
-    sudo pkill -u deploy
-    sudo userdel -r deploy 2>/dev/null
+    sudo pkill -9 -u deploy 2>/dev/null || true
+    sudo userdel -f deploy 2>/dev/null || true
     sudo rm -rf /home/deploy
 
-    # 4. Remover Redis completamente
-    log_message "Removendo Redis..."
-    sudo systemctl stop redis-server
-    sudo apt-get remove --purge -y redis-server redis-tools
-    sudo rm -rf /etc/redis
-    sudo rm -rf /var/lib/redis
-    sudo rm -f /etc/init.d/redis-server
+    # 5. Remover pacotes com --force-yes
+    log_message "Removendo pacotes..."
+    sudo DEBIAN_FRONTEND=noninteractive apt-get remove --purge -y --force-yes \
+        nginx nginx-common nginx-full \
+        redis-server redis-tools \
+        postgresql* \
+        nodejs npm \
+        2>/dev/null || true
 
-    # 5. Remover PostgreSQL
-    log_message "Removendo PostgreSQL..."
-    sudo systemctl stop postgresql
-    sudo su - postgres << EOF 2>/dev/null
-        psql -c "DROP DATABASE template1;"
-        for db in \$(psql -t -c "SELECT datname FROM pg_database WHERE datistemplate = false AND datname != 'postgres';"); do
-            dropdb "\$db"
-        done
-EOF
-    sudo apt-get remove --purge -y postgresql*
-    sudo rm -rf /etc/postgresql
-    sudo rm -rf /var/lib/postgresql
-    sudo rm -rf /var/log/postgresql
-
-    # 6. Remover Nginx
-    log_message "Removendo Nginx..."
-    sudo systemctl stop nginx
-    sudo apt-get remove --purge -y nginx nginx-common
+    # 6. Limpar diretórios com force
+    log_message "Removendo diretórios..."
     sudo rm -rf /etc/nginx
+    sudo rm -rf /etc/postgresql
+    sudo rm -rf /etc/redis
+    sudo rm -rf /var/lib/postgresql
+    sudo rm -rf /var/lib/redis
+    sudo rm -rf /var/www/html/*
+    sudo rm -rf /var/log/postgresql
     sudo rm -rf /var/log/nginx
+    sudo rm -rf /var/log/redis
+    sudo rm -rf /var/log/autoatende
+    sudo rm -rf /root/.pm2
+    sudo rm -rf /root/.npm
 
-    # 7. Limpar pacotes e dependências
+    # 7. Remover regras do firewall com força
+    log_message "Removendo regras do firewall..."
+    for port in 80 443 5432 6379 3000 8080; do
+        sudo ufw delete allow $port 2>/dev/null || true
+    done
+
+    # 8. Remover repositórios e chaves
+    log_message "Removendo repositórios..."
+    sudo rm -f /etc/apt/sources.list.d/redis.list
+    sudo rm -f /etc/apt/sources.list.d/pgdg*
+    sudo rm -f /etc/apt/sources.list.d/nodesource.list
+    sudo rm -f /usr/share/keyrings/redis-archive-keyring.gpg
+    sudo rm -f /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+
+    # 9. Limpar pacotes e cache
     log_message "Limpando sistema..."
     sudo apt-get autoremove -y
     sudo apt-get autoclean
     sudo apt-get clean
 
-    # 8. Remover diretórios residuais
-    log_message "Removendo diretórios residuais..."
-    sudo rm -rf /var/www/html/*
-    sudo rm -rf /etc/systemd/system/pm2-*
-    sudo rm -rf /var/log/autoatende/*
-
-    # 9. Recarregar systemd
-    log_message "Recarregando systemd..."
+    # 10. Recarregar systemd
     sudo systemctl daemon-reload
 
-    # 10. Remover regras do firewall
-    log_message "Removendo regras do firewall..."
-    sudo ufw delete allow 80
-    sudo ufw delete allow 443
-    sudo ufw delete allow 5432
-    sudo ufw delete allow 3000
-    sudo ufw delete allow 8080
-
-    # 11. Limpar fontes apt
-    log_message "Limpando fontes apt..."
-    sudo rm -f /etc/apt/sources.list.d/redis.list
-    sudo rm -f /etc/apt/sources.list.d/pgdg*
-    sudo rm -f /usr/share/keyrings/redis-archive-keyring.gpg
-    sudo rm -f /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
-
-    # 12. Atualizar sistema
+    # 11. Atualizar sistema
     log_message "Atualizando sistema..."
     sudo apt-get update -y
 
