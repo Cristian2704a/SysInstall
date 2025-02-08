@@ -153,7 +153,7 @@ remove_complete_system() {
     if [ "$confirmation" != "CONFIRMAR" ]; then
         log_message "Operação cancelada pelo usuário"
         return 1
-    }
+    fi
 
     log_message "Iniciando remoção completa do sistema"
 
