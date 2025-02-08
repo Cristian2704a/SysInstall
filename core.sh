@@ -5,25 +5,46 @@ setup_logging() {
     LOG_DIR="/var/log/autoatende"
     LOG_FILE="$LOG_DIR/install_$(date +%Y%m%d_%H%M%S).log"
     mkdir -p $LOG_DIR
-    exec 1> >(tee -a "$LOG_FILE")
-    exec 2> >(tee -a "$LOG_FILE" >&2)
-    echo "=== Iniciando instalação do AutoAtende em $(date) ==="
+    
+    # Criar função para logging limpo
+    log_message() {
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+    }
+    
+    # Redirecionar stdout e stderr para o arquivo de log e console
+    exec 1> >(while read -r line; do
+        if [[ $line =~ ^\s*\x1B\[[0-9;]*[mK] ]]; then
+            # Remove códigos de cores ANSI e mantém apenas o texto limpo
+            clean_line=$(echo "$line" | sed 's/\x1B\[[0-9;]*[mK]//g')
+            if [[ $clean_line =~ ^[[:space:]]*💻[[:space:]]*(.*) ]]; then
+                echo "$(date '+%Y-%m-%d %H:%M:%S') - ${BASH_REMATCH[1]}" >> "$LOG_FILE"
+            else
+                echo "$clean_line" >> "$LOG_FILE"
+            fi
+        else
+            echo "$line" >> "$LOG_FILE"
+        fi
+        echo "$line"
+    done)
+    
+    exec 2> >(while read -r line; do
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - ERROR: $line" | tee -a "$LOG_FILE"
+    done)
+
+    log_message "=== Iniciando instalação do AutoAtende ==="
+    log_message "Tipo de instalação: $1"
 }
 
-# Função para imprimir o banner
-print_banner() {
-  clear
-  printf "\n\n"
-  printf "${BLUE}"
-  printf " █████╗ ██╗   ██╗████████╗ ██████╗  █████╗ ████████╗███████╗███╗   ██╗██████╗ ███████╗ \n"
-  printf "██╔══██╗██║   ██║╚══██╔══╝██╔═══██╗██╔══██╗╚══██╔══╝██╔════╝████╗  ██║██╔══██╗██╔════╝ \n"
-  printf "███████║██║   ██║   ██║   ██║   ██║███████║   ██║   █████╗  ██╔██╗ ██║██║  ██║█████╗   \n"
-  printf "██╔══██║██║   ██║   ██║   ██║   ██║██╔══██║   ██║   ██╔══╝  ██║╚██╗██║██║  ██║██╔══╝   \n"
-  printf "██║  ██║╚██████╔╝   ██║   ╚██████╔╝██║  ██║   ██║   ███████╗██║ ╚████║██████╔╝███████╗ \n"
-  printf "╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═══╝╚═════╝ ╚══════╝ \n"
-  printf "            \033[1;37m        ©lucassaud\n"
-  printf "${NC}"
-  printf "\n"
+# Função para imprimir mensagens no log
+log_message() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+}
+
+# Função para tratar erros
+handle_error() {
+    local error_message=$1
+    log_message "ERRO: $error_message"
+    return 1
 }
 
 # Funções de coleta de dados
@@ -34,16 +55,11 @@ get_mysql_root_password() {
   read -p "> " mysql_root_password
 }
 
-get_repo_info() {
+get_token_code() {
   print_banner
   printf "${WHITE} 💻 Digite o token para baixar o código:${GRAY_LIGHT}"
   printf "\n\n"
   read -p "> " token_code
-
-  print_banner
-  printf "${WHITE} 💻 Digite o nome do repositório (Ex: AA-APP):${GRAY_LIGHT}"
-  printf "\n\n"
-  read -p "> " repo_name
 }
 
 get_pwa_name() {
@@ -58,20 +74,6 @@ get_instancia_add() {
   printf "${WHITE} 💻 Informe um nome para a Instancia/Empresa (Letras minúsculas, sem espaços/caracteres especiais):${GRAY_LIGHT}"
   printf "\n\n"
   read -p "> " instancia_add
-}
-
-get_max_whats() {
-  print_banner
-  printf "${WHITE} 💻 Informe a quantidade de Conexões/Whats que a ${instancia_add} poderá cadastrar:${GRAY_LIGHT}"
-  printf "\n\n"
-  read -p "> " max_whats
-}
-
-get_max_user() {
-  print_banner
-  printf "${WHITE} 💻 Informe a quantidade de Usuários/Atendentes que a ${instancia_add} poderá cadastrar:${GRAY_LIGHT}"
-  printf "\n\n"
-  read -p "> " max_user
 }
 
 get_frontend_url() {
@@ -95,262 +97,234 @@ get_backend_port() {
   read -p "> " backend_port
 }
 
-get_redis_port() {
-  print_banner
-  printf "${WHITE} 💻 Digite a porta do REDIS/AGENDAMENTO MSG para a ${instancia_add} (Ex: 5000 A 5999):${GRAY_LIGHT}"
-  printf "\n\n"
-  read -p "> " redis_port
-}
-
+# Função principal de coleta de dados
 get_urls() {
   get_mysql_root_password
-  get_repo_info
+  get_token_code
   get_instancia_add
-  get_max_whats
-  get_max_user
   get_frontend_url
   get_backend_url
   get_backend_port
-  get_redis_port
   get_pwa_name
+  
+  # Definir valores padrão
+  redis_port=6379
+  repo_name="Sys"
+  max_whats=250
+  max_user=500
 }
 
-# Função para remover uma instância ou sistema completo
-software_delete() {
-  print_banner
-  printf "${WHITE} 💻 Selecione o tipo de remoção:${GRAY_LIGHT}"
-  printf "\n\n"
-  printf "   [1] Remover uma instância\n"
-  printf "   [2] Remover instalação completa do sistema\n"
-  printf "   [3] Voltar\n"
-  printf "\n"
-  read -p "> " delete_type
-
-  case "${delete_type}" in
-    1) remove_instance ;;
-    2) remove_complete_system ;;
-    3) return ;;
-    *) echo "Opção inválida" && sleep 2 && software_delete ;;
-  esac
-}
-
-# Função para remover uma instância específica
+# Função de remoção de instância
 remove_instance() {
-  print_banner
-  printf "${WHITE} 💻 Digite o nome da Instancia/Empresa que será Deletada:${GRAY_LIGHT}"
-  printf "\n\n"
-  read -p "> " empresa_delete
+    log_message "Iniciando remoção de instância"
+    read -p "Digite o nome da Instancia/Empresa que será Deletada: " empresa_delete
 
-  print_banner
-  printf "${WHITE} 💻 Removendo a instância ${empresa_delete}...${GRAY_LIGHT}"
-  printf "\n\n"
+    log_message "Removendo a instância ${empresa_delete}"
 
-  # Parar e remover serviços
-  sudo su - deploy <<EOF
-    pm2 delete ${empresa_delete}-backend
-    pm2 save
-    rm -rf /home/deploy/${empresa_delete}
+    # Parar e remover serviços
+    sudo su - deploy <<EOF
+        pm2 delete ${empresa_delete}-backend
+        pm2 save
+        rm -rf /home/deploy/${empresa_delete}
 EOF
 
-  # Remover configurações do nginx
-  sudo rm -f /etc/nginx/sites-enabled/${empresa_delete}-*
-  sudo rm -f /etc/nginx/sites-available/${empresa_delete}-*
+    # Remover configurações do nginx
+    sudo rm -f /etc/nginx/sites-enabled/${empresa_delete}-*
+    sudo rm -f /etc/nginx/sites-available/${empresa_delete}-*
 
-  # Remover banco de dados
-  sudo su - postgres <<EOF
-    dropdb ${empresa_delete}
-    dropuser ${empresa_delete}
+    # Remover banco de dados
+    sudo su - postgres <<EOF
+        dropdb ${empresa_delete}
+        dropuser ${empresa_delete}
 EOF
 
-  # Reiniciar nginx
-  sudo systemctl restart nginx
+    # Reiniciar nginx
+    sudo systemctl restart nginx
 
-  print_banner
-  printf "${GREEN} ✅ Instância ${empresa_delete} removida com sucesso!${NC}"
-  printf "\n\n"
-  sleep 2
+    log_message "Instância ${empresa_delete} removida com sucesso"
 }
 
-# Função para remover completamente o sistema
+# Função de remoção completa do sistema
 remove_complete_system() {
-  print_banner
-  printf "${WHITE} ⚠️ ATENÇÃO: Isso removerá completamente o sistema e todas as instâncias.${NC}"
-  printf "\n\n"
-  printf "${WHITE} Digite 'CONFIRMAR' para prosseguir com a remoção:${GRAY_LIGHT}"
-  printf "\n\n"
-  read -p "> " confirmation
+    log_message "ATENÇÃO: Isso removerá completamente o sistema e todas as instâncias"
+    read -p "Digite 'CONFIRMAR' para prosseguir com a remoção: " confirmation
 
-  if [ "$confirmation" != "CONFIRMAR" ]; then
-    print_banner
-    printf "${RED} ❌ Operação cancelada pelo usuário${NC}"
-    printf "\n\n"
-    sleep 2
-    return
-  fi
+    if [ "$confirmation" != "CONFIRMAR" ]; then
+        log_message "Operação cancelada pelo usuário"
+        return 1
+    }
 
-  print_banner
-  printf "${WHITE} 🗑️ Removendo sistema...${GRAY_LIGHT}"
-  printf "\n\n"
+    log_message "Iniciando remoção completa do sistema"
 
-  # Logging detalhado de cada operação
-  echo "=== Iniciando remoção completa do sistema em $(date) ===" | tee -a "$LOG_FILE"
-
-  # Parar e remover serviços PM2
-  echo "Parando serviços PM2..." | tee -a "$LOG_FILE"
-  sudo su - deploy << EOF 2>&1 | tee -a "$LOG_FILE"
-    pm2 list
-    pm2 kill
-    pm2 save
-    pm2 unstartup systemd
+    # 1. Parar todos os serviços primeiro
+    log_message "Parando serviços..."
+    sudo systemctl stop nginx
+    sudo systemctl stop redis-server
+    sudo systemctl stop postgresql
+    
+    # 2. Remover PM2 e suas configurações
+    log_message "Removendo PM2..."
+    sudo su - deploy << EOF 2>/dev/null
+        pm2 delete all
+        pm2 kill
+        pm2 unstartup systemd
 EOF
+    sudo npm remove -g pm2
+    sudo rm -rf /usr/lib/node_modules/pm2
+    sudo rm -f /etc/systemd/system/pm2-*
+    sudo rm -rf /root/.pm2
 
-  # Listar e remover instâncias
-  echo "Listando instâncias antes da remoção..." | tee -a "$LOG_FILE"
-  ls -la /home/deploy/ 2>&1 | tee -a "$LOG_FILE"
+    # 3. Remover usuário deploy e seus arquivos
+    log_message "Removendo usuário deploy..."
+    sudo pkill -u deploy
+    sudo userdel -r deploy 2>/dev/null
+    sudo rm -rf /home/deploy
 
-  # Remover bancos de dados PostgreSQL
-  echo "Removendo bancos de dados PostgreSQL..." | tee -a "$LOG_FILE"
-  sudo su - postgres << EOF 2>&1 | tee -a "$LOG_FILE"
-    psql -l
-    for db in \$(psql -t -c "SELECT datname FROM pg_database WHERE datistemplate = false AND datname != 'postgres';"); do
-      echo "Removendo banco \$db"
-      dropdb "\$db"
-    done
+    # 4. Remover Redis completamente
+    log_message "Removendo Redis..."
+    sudo systemctl stop redis-server
+    sudo apt-get remove --purge -y redis-server redis-tools
+    sudo rm -rf /etc/redis
+    sudo rm -rf /var/lib/redis
+    sudo rm -f /etc/init.d/redis-server
+
+    # 5. Remover PostgreSQL
+    log_message "Removendo PostgreSQL..."
+    sudo systemctl stop postgresql
+    sudo su - postgres << EOF 2>/dev/null
+        psql -c "DROP DATABASE template1;"
+        for db in \$(psql -t -c "SELECT datname FROM pg_database WHERE datistemplate = false AND datname != 'postgres';"); do
+            dropdb "\$db"
+        done
 EOF
+    sudo apt-get remove --purge -y postgresql*
+    sudo rm -rf /etc/postgresql
+    sudo rm -rf /var/lib/postgresql
+    sudo rm -rf /var/log/postgresql
 
-  # Remover usuário deploy e seus arquivos
-  echo "Removendo usuário deploy e arquivos..." | tee -a "$LOG_FILE"
-  sudo pkill -u deploy 2>&1 | tee -a "$LOG_FILE"
-  sudo deluser --remove-home deploy 2>&1 | tee -a "$LOG_FILE"
+    # 6. Remover Nginx
+    log_message "Removendo Nginx..."
+    sudo systemctl stop nginx
+    sudo apt-get remove --purge -y nginx nginx-common
+    sudo rm -rf /etc/nginx
+    sudo rm -rf /var/log/nginx
 
-  # Remover pacotes do sistema
-  echo "Removendo pacotes do sistema..." | tee -a "$LOG_FILE"
-  sudo apt remove --purge -y nginx postgresql redis-server 2>&1 | tee -a "$LOG_FILE"
-  sudo apt autoremove -y 2>&1 | tee -a "$LOG_FILE"
+    # 7. Limpar pacotes e dependências
+    log_message "Limpando sistema..."
+    sudo apt-get autoremove -y
+    sudo apt-get autoclean
+    sudo apt-get clean
 
-  # Remover configurações
-  echo "Removendo arquivos de configuração..." | tee -a "$LOG_FILE"
-  sudo rm -rf /etc/nginx/sites-enabled/* 2>&1 | tee -a "$LOG_FILE"
-  sudo rm -rf /etc/nginx/sites-available/* 2>&1 | tee -a "$LOG_FILE"
-  sudo rm -rf /etc/postgresql 2>&1 | tee -a "$LOG_FILE"
-  sudo rm -rf /etc/redis 2>&1 | tee -a "$LOG_FILE"
-  sudo rm -rf /var/lib/postgresql 2>&1 | tee -a "$LOG_FILE"
-  sudo rm -rf /var/lib/redis 2>&1 | tee -a "$LOG_FILE"
+    # 8. Remover diretórios residuais
+    log_message "Removendo diretórios residuais..."
+    sudo rm -rf /var/www/html/*
+    sudo rm -rf /etc/systemd/system/pm2-*
+    sudo rm -rf /var/log/autoatende/*
 
-  echo "=== Remoção do sistema concluída em $(date) ===" | tee -a "$LOG_FILE"
+    # 9. Recarregar systemd
+    log_message "Recarregando systemd..."
+    sudo systemctl daemon-reload
 
-  print_banner
-  printf "${GREEN} ✅ Sistema removido com sucesso!${NC}"
-  printf "\n${GREEN} ℹ️ Log completo disponível em: ${LOG_FILE}${NC}"
-  printf "\n${GREEN} ℹ️ Para reinstalar, use a opção 'Instalação Primária'${NC}"
-  printf "\n\n"
-  sleep 2
+    # 10. Remover regras do firewall
+    log_message "Removendo regras do firewall..."
+    sudo ufw delete allow 80
+    sudo ufw delete allow 443
+    sudo ufw delete allow 5432
+    sudo ufw delete allow 3000
+    sudo ufw delete allow 8080
+
+    # 11. Limpar fontes apt
+    log_message "Limpando fontes apt..."
+    sudo rm -f /etc/apt/sources.list.d/redis.list
+    sudo rm -f /etc/apt/sources.list.d/pgdg*
+    sudo rm -f /usr/share/keyrings/redis-archive-keyring.gpg
+    sudo rm -f /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+
+    # 12. Atualizar sistema
+    log_message "Atualizando sistema..."
+    sudo apt-get update -y
+
+    log_message "Sistema removido com sucesso"
+    log_message "Para reinstalar, use a opção 'Instalação Primária'"
 }
+
 # Funções de sistema
 system_update() {
-  print_banner
-  printf "${WHITE} 💻 Atualizando o sistema...${GRAY_LIGHT}"
-  printf "\n\n"
-
-  # Atualização do sistema e instalação de dependências para Ubuntu 24.04
-  sudo apt -y update
-  sudo apt -y upgrade
-  sudo apt-get install -y build-essential libgbm-dev wget unzip fontconfig locales gconf-service libasound2 libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 libfontconfig1 libgconf-2-4 libgdk-pixbuf2.0-0 libglib2.0-0 libgtk-3-0 libnspr4 libpango-1.0-0 libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 libxss1 libxtst6 ca-certificates fonts-liberation libnss3 xdg-utils git
-  sudo apt-get autoremove -y
+    log_message "Atualizando o sistema"
+    sudo apt-get -y update >> "$LOG_FILE" 2>&1 || handle_error "Falha na atualização do sistema"
+    sudo apt-get -y upgrade >> "$LOG_FILE" 2>&1 || handle_error "Falha no upgrade do sistema"
+    sudo apt-get install -y build-essential libgbm-dev wget unzip fontconfig locales >> "$LOG_FILE" 2>&1
 }
 
 system_create_user() {
-  print_banner
-  printf "${WHITE} 💻 Criando usuário deploy...${GRAY_LIGHT}"
-  printf "\n\n"
+    log_message "Criando usuário deploy"
+    useradd -m -p $(openssl passwd -6 ${mysql_root_password}) -s /bin/bash -G sudo deploy
+    usermod -aG sudo deploy
+    usermod -aG www-data deploy
+    usermod -aG deploy www-data
 
-  # Criar usuário deploy
-  useradd -m -p $(openssl passwd -6 ${mysql_root_password}) -s /bin/bash -G sudo deploy
-  usermod -aG sudo deploy
-  
-  # Adicionar usuário www-data ao grupo deploy e vice-versa
-  usermod -aG www-data deploy
-  usermod -aG deploy www-data
-
-  # Configurar NVM no bashrc do usuário deploy
-  sudo su - deploy << EOF
-    echo 'export NVM_DIR="\$HOME/.nvm"' >> ~/.bashrc
-    echo '[ -s "\$NVM_DIR/nvm.sh" ] && \. "\$NVM_DIR/nvm.sh"' >> ~/.bashrc
-    echo '[ -s "\$NVM_DIR/bash_completion" ] && \. "\$NVM_DIR/bash_completion"' >> ~/.bashrc
+    sudo su - deploy << EOF
+        echo 'export NVM_DIR="\$HOME/.nvm"' >> ~/.bashrc
+        echo '[ -s "\$NVM_DIR/nvm.sh" ] && \. "\$NVM_DIR/nvm.sh"' >> ~/.bashrc
+        echo '[ -s "\$NVM_DIR/bash_completion" ] && \. "\$NVM_DIR/bash_completion"' >> ~/.bashrc
 EOF
 }
 
 setup_firewall() {
-  print_banner
-  printf "${WHITE} 💻 Configurando firewall...${GRAY_LIGHT}"
-  printf "\n\n"
-
-  sudo ufw default deny incoming
-  sudo ufw default allow outgoing
-  sudo ufw allow 22
-  sudo ufw allow 80
-  sudo ufw allow 443
-  sudo ufw allow 5432
-  sudo ufw allow ${redis_port}
-  sudo ufw allow ${backend_port}
-  echo "y" | sudo ufw enable
+    log_message "Configurando firewall"
+    sudo ufw default deny incoming
+    sudo ufw default allow outgoing
+    sudo ufw allow 22
+    sudo ufw allow 80
+    sudo ufw allow 443
+    sudo ufw allow 5432
+    sudo ufw allow ${redis_port}
+    sudo ufw allow ${backend_port}
+    echo "y" | sudo ufw enable
 }
 
 system_node_install() {
-  print_banner
-  printf "${WHITE} 💻 Instalando Node.js 20 e PM2...${GRAY_LIGHT}"
-  printf "\n\n"
+    log_message "Instalando Node.js 20 e PM2"
 
-  # Primeiro instalar PM2 globalmente como root
-  sudo su - root << EOF
-  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-  sudo apt install -y nodejs
-  sudo npm install -g npm@latest
-  sudo npm install -g pm2@latest
-  sudo pm2 startup ubuntu -u deploy
-  sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u deploy --hp /home/deploy
+    # Instalar PM2 globalmente como root
+    sudo su - root << EOF
+        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+        sudo apt install -y nodejs
+        sudo npm install -g npm@latest
+        sudo npm install -g pm2@latest
+        sudo pm2 startup ubuntu -u deploy
+        sudo env PATH=\$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u deploy --hp /home/deploy
 EOF
 
-  # Depois instalar NVM e Node.js para o usuário deploy
-  sudo su - deploy << EOF
-    # Remover instalações anteriores do NVM se existirem
-    rm -rf ~/.nvm
-
-    # Instalar NVM
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-    
-    # Carregar NVM imediatamente
-    export NVM_DIR="\$HOME/.nvm"
-    [ -s "\$NVM_DIR/nvm.sh" ] && \. "\$NVM_DIR/nvm.sh"
-    
-    # Instalar Node.js
-    nvm install 20.18.0
-    nvm use 20.18.0
-    nvm alias default 20.18.0
+    # Instalar NVM e Node.js para o usuário deploy
+    sudo su - deploy << EOF
+        rm -rf ~/.nvm
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+        export NVM_DIR="\$HOME/.nvm"
+        [ -s "\$NVM_DIR/nvm.sh" ] && \. "\$NVM_DIR/nvm.sh"
+        nvm install 20.18.0
+        nvm use 20.18.0
+        nvm alias default 20.18.0
 EOF
 
-  # Salvar a configuração do PM2
-  sudo su - deploy << EOF
-    pm2 save
+    # Salvar configuração do PM2
+    sudo su - deploy << EOF
+        pm2 save
 EOF
-
-  sleep 2
 }
 
 system_redis_install() {
-  print_banner
-  printf "${WHITE} 💻 Instalando Redis...${GRAY_LIGHT}"
-  printf "\n\n"
+    log_message "Instalando Redis"
 
-  # Adicionar repositório do Redis para Ubuntu 24.04
-  curl -fsSL https://packages.redis.io/gpg | sudo gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
-  echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/redis.list
+    # Adicionar repositório do Redis
+    curl -fsSL https://packages.redis.io/gpg | sudo gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
+    echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/redis.list
 
-  sudo apt-get update
-  sudo apt-get install -y redis-server
+    sudo apt-get update
+    sudo apt-get install -y redis-server
 
-  # Configurar Redis
-  sudo tee /etc/redis/redis.conf > /dev/null << EOF
+    # Configurar Redis
+    sudo tee /etc/redis/redis.conf > /dev/null << EOF
 port ${redis_port}
 bind 127.0.0.1
 supervised systemd
@@ -364,39 +338,31 @@ auto-aof-rewrite-percentage 100
 auto-aof-rewrite-min-size 64mb
 EOF
 
-  sudo systemctl restart redis-server
-  sudo systemctl enable redis-server
-
-  sleep 2
+    sudo systemctl restart redis-server
+    sudo systemctl enable redis-server
 }
 
 system_postgres_install() {
-  print_banner
-  printf "${WHITE} 💻 Instalando PostgreSQL...${GRAY_LIGHT}"
-  printf "\n\n"
+    log_message "Instalando PostgreSQL"
 
-  # Instalar PostgreSQL 16 no Ubuntu 24.04
-  sudo apt install -y postgresql-common
-  sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
-  sudo apt update
-  sudo apt install -y postgresql-16 postgresql-client-16
-  
-  # Iniciar e habilitar o serviço
-  sudo systemctl start postgresql
-  sudo systemctl enable postgresql
+    sudo apt install -y postgresql-common
+    sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+    sudo apt update
+    sudo apt install -y postgresql-16 postgresql-client-16
+    
+    sudo systemctl start postgresql
+    sudo systemctl enable postgresql
 }
 
 system_nginx_install() {
-  print_banner
-  printf "${WHITE} 💻 Instalando nginx...${GRAY_LIGHT}"
-  printf "\n\n"
+    log_message "Instalando nginx"
 
-  sudo apt install -y nginx
-  sudo rm -rf /etc/nginx/sites-enabled/default
-  sudo rm -rf /etc/nginx/sites-available/default
-  
-  # Configurações otimizadas para o Nginx no Ubuntu 24.04
-  sudo tee /etc/nginx/nginx.conf > /dev/null << 'EOF'
+    sudo apt install -y nginx
+    sudo rm -rf /etc/nginx/sites-enabled/default
+    sudo rm -rf /etc/nginx/sites-available/default
+    
+    # Configurações otimizadas para o Nginx
+    sudo tee /etc/nginx/nginx.conf > /dev/null << 'EOF'
 user www-data;
 worker_processes auto;
 pid /run/nginx.pid;
@@ -438,91 +404,73 @@ EOF
 }
 
 system_certbot_install() {
-  print_banner
-  printf "${WHITE} 💻 Instalando certbot...${GRAY_LIGHT}"
-  printf "\n\n"
-
-  sudo apt install -y snapd
-  sudo snap install core
-  sudo snap refresh core
-  sudo apt-get remove certbot
-  sudo snap install --classic certbot
-  sudo ln -sf /snap/bin/certbot /usr/bin/certbot
+    log_message "Instalando certbot"
+    sudo apt install -y snapd
+    sudo snap install core
+    sudo snap refresh core
+    sudo apt-get remove certbot
+    sudo snap install --classic certbot
+    sudo ln -sf /snap/bin/certbot /usr/bin/certbot
 }
 
 create_manifest_json() {
-  print_banner
-  printf "${WHITE} 💻 Criando manifest.json para PWA...${GRAY_LIGHT}"
-  printf "\n\n"
+    log_message "Criando manifest.json para PWA"
 
-  sleep 2
-
-sudo su - deploy << EOF
-  # Garantir que o diretório public existe
-  mkdir -p /home/deploy/${instancia_add}/frontend/public
-  
-  cat > /home/deploy/${instancia_add}/frontend/public/manifest.json << END
+    sudo su - deploy << EOF
+        mkdir -p /home/deploy/${instancia_add}/frontend/public
+        
+        cat > /home/deploy/${instancia_add}/frontend/public/manifest.json << END
 {
-  "short_name": "${pwa_name}",
-  "name": "${pwa_name}",
-  "icons": [
-    {
-      "src": "favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
-    },
-    {
-      "src": "android-chrome-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    }
-  ],
-  "start_url": ".",
-  "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+    "short_name": "${pwa_name}",
+    "name": "${pwa_name}",
+    "icons": [
+        {
+            "src": "favicon.ico",
+            "sizes": "64x64 32x32 24x24 16x16",
+            "type": "image/x-icon"
+        },
+        {
+            "src": "android-chrome-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        }
+    ],
+    "start_url": ".",
+    "display": "standalone",
+    "theme_color": "#000000",
+    "background_color": "#ffffff"
 }
 END
 
-  chmod 755 /home/deploy/${instancia_add}/frontend/public/manifest.json
+        chmod 775 /home/deploy/${instancia_add}/frontend/public/manifest.json
 EOF
-
-  sleep 2
 }
 
 # Backend
 backend_postgres_create() {
-  print_banner
-  printf "${WHITE} 💻 Configurando banco de dados...${GRAY_LIGHT}"
-  printf "\n\n"
+    log_message "Configurando banco de dados PostgreSQL"
 
-  sleep 2
-
-  sudo su - postgres <<EOF
-  createdb ${instancia_add}
-  psql -c "CREATE USER ${instancia_add} WITH ENCRYPTED PASSWORD '${mysql_root_password}';"
-  psql -c "ALTER USER ${instancia_add} WITH SUPERUSER;"
-  psql -c "GRANT ALL PRIVILEGES ON DATABASE ${instancia_add} TO ${instancia_add};"
+    sudo su - postgres <<EOF
+        createdb ${instancia_add}
+        psql -c "CREATE USER ${instancia_add} WITH ENCRYPTED PASSWORD '${mysql_root_password}';"
+        psql -c "ALTER USER ${instancia_add} WITH SUPERUSER;"
+        psql -c "GRANT ALL PRIVILEGES ON DATABASE ${instancia_add} TO ${instancia_add};"
 EOF
 }
 
 backend_env_create() {
-  print_banner
-  printf "${WHITE} 💻 Configurando variáveis de ambiente do backend...${GRAY_LIGHT}"
-  printf "\n\n"
+    log_message "Configurando variáveis de ambiente do backend"
 
-  sleep 2
+    JWT_SECRET=$(openssl rand -hex 32)
+    JWT_REFRESH_SECRET=$(openssl rand -hex 32)
 
-  JWT_SECRET=$(openssl rand -hex 32)
-  JWT_REFRESH_SECRET=$(openssl rand -hex 32)
-
-sudo su - deploy << EOF
-  cat <<[-]EOF > /home/deploy/${instancia_add}/backend/.env
+    sudo su - deploy << EOF
+        cat <<[-]EOF > /home/deploy/${instancia_add}/backend/.env
 NODE_ENV=production
 BACKEND_URL=${backend_url}
 BACKEND_PUBLIC_PATH=/home/deploy/${instancia_add}/backend/public
 BACKEND_LOGS_PATH=/home/deploy/${instancia_add}/backend/logs
-BACKEND_SESSION_PATH=/home/deploy/${instancia_add}/backend/.sessions
+BACKEND_SESSION_PATH=/home/deploy/${instancia_add}/backend/metadados
 FRONTEND_URL=${frontend_url}
 PROXY_PORT=443
 PORT=${backend_port}
@@ -548,132 +496,108 @@ JWT_SECRET=${JWT_SECRET}
 JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
 [-]EOF
 EOF
-
-  sleep 2
 }
 
 backend_install() {
-  print_banner
-  printf "${WHITE} 💻 Instalando backend...${GRAY_LIGHT}"
-  printf "\n\n"
+    log_message "Instalando backend"
 
-  sleep 2
+    sudo su - deploy <<EOF
+        cd /home/deploy/${instancia_add}/backend
+        
+        mkdir -p logs
+        mkdir -p public/company1/{medias,tasks,announcements,logos,backgrounds,quickMessages,profile}
+        
+        sudo chown -R deploy:www-data public
+        sudo chmod -R 775 public
+        
+        sudo chown -R deploy:www-data logs
+        sudo chmod -R 775 logs
 
-  sudo su - deploy <<EOF
-  cd /home/deploy/${instancia_add}/backend
-  
-  mkdir -p logs
-  mkdir -p public/company1/{medias,tasks,announcements,logos,backgrounds,quickMessages,profile}
-  
-  sudo chown -R deploy:www-data public
-  sudo chmod -R 775 public
-  
-  sudo chown -R deploy:www-data logs
-  sudo chmod -R 775 logs
-
-  sudo usermod -a -G www-data deploy
-  
-  sudo chmod g+s public
-  sudo chmod g+s logs
-  
-  npm install
-  npm run build
-  
-  npx sequelize db:migrate
-  npx sequelize db:seed:all
-  
-  rm -rf src
+        sudo usermod -a -G www-data deploy
+        
+        sudo chmod g+s public
+        sudo chmod g+s logs
+        
+        npm install
+        npm run build
+        
+        npx sequelize db:migrate
+        npx sequelize db:seed:all
+        
+        rm -rf src
 EOF
-
-  sleep 2
 }
 
 backend_start_pm2() {
-  print_banner
-  printf "${WHITE} 💻 Iniciando PM2 (backend)...${GRAY_LIGHT}"
-  printf "\n\n"
+    log_message "Iniciando PM2 (backend)"
 
-  sleep 2
-
-  sudo su - deploy << EOF
-  cat > /home/deploy/${instancia_add}/backend/ecosystem.config.js << 'END'
+    sudo su - deploy << EOF
+        cat > /home/deploy/${instancia_add}/backend/ecosystem.config.js << 'END'
 module.exports = {
-  apps: [{
-    name: "${instancia_add}-backend",
-    script: "./dist/server.js",
-    node_args: "--expose-gc --max-old-space-size=8192",
-    exec_mode: "fork",
-    max_memory_restart: "6G",
-    max_restarts: 5,
-    instances: 1,
-    watch: false,
-    error_file: "/home/deploy/${instancia_add}/backend/logs/error.log",
-    out_file: "/home/deploy/${instancia_add}/backend/logs/out.log",
-    env: {
-      NODE_ENV: "production"
-    }
-  }]
+    apps: [{
+        name: "${instancia_add}-backend",
+        script: "./dist/server.js",
+        node_args: "--expose-gc --max-old-space-size=8192",
+        exec_mode: "fork",
+        max_memory_restart: "6G",
+        max_restarts: 5,
+        instances: 1,
+        watch: false,
+        error_file: "/home/deploy/${instancia_add}/backend/logs/error.log",
+        out_file: "/home/deploy/${instancia_add}/backend/logs/out.log",
+        env: {
+            NODE_ENV: "production"
+        }
+    }]
 }
 END
 
-  cd /home/deploy/${instancia_add}/backend
-  pm2 start ecosystem.config.js --env production
-  pm2 save
+        cd /home/deploy/${instancia_add}/backend
+        pm2 start ecosystem.config.js --env production
+        pm2 save
 EOF
-
-  sleep 2
 }
 
 backend_nginx_setup() {
-  print_banner
-  printf "${WHITE} 💻 Configurando nginx (backend)...${GRAY_LIGHT}"
-  printf "\n\n"
+    log_message "Configurando nginx (backend)"
 
-  sleep 2
+    backend_hostname=$(echo "${backend_url/https:\/\/}")
 
-  backend_hostname=$(echo "${backend_url/https:\/\/}")
-
-sudo su - root << EOF
-cat > /etc/nginx/sites-available/${instancia_add}-backend << 'END'
+    sudo su - root << EOF
+        cat > /etc/nginx/sites-available/${instancia_add}-backend << 'END'
 server {
-  server_name $backend_hostname;
-  location / {
-    proxy_pass http://127.0.0.1:${backend_port};
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade \$http_upgrade;
-    proxy_set_header Connection 'upgrade';
-    proxy_set_header Host \$host;
-    proxy_set_header X-Real-IP \$remote_addr;
-    proxy_set_header X-Forwarded-Proto \$scheme;
-    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    proxy_cache_bypass \$http_upgrade;
-  }
+    server_name $backend_hostname;
+    location / {
+        proxy_pass http://127.0.0.1:${backend_port};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_cache_bypass \$http_upgrade;
+    }
 
-  # Bloquear solicitacoes de arquivos do GitHub
-  location ~ /\.git {
-    deny all;
-  }
+    # Bloquear solicitacoes de arquivos do GitHub
+    location ~ /\.git {
+        deny all;
+    }
 }
 END
 
-ln -s /etc/nginx/sites-available/${instancia_add}-backend /etc/nginx/sites-enabled
+        ln -s /etc/nginx/sites-available/${instancia_add}-backend /etc/nginx/sites-enabled
 EOF
-
-  sleep 2
 }
 
 # Frontend
 frontend_env_create() {
-  print_banner
-  printf "${WHITE} 💻 Configurando variáveis de ambiente do frontend...${GRAY_LIGHT}"
-  printf "\n\n"
+    log_message "Configurando variáveis de ambiente do frontend"
 
-  sleep 2
+    backend_hostname=$(echo "${backend_url/https:\/\/}")
 
-  backend_hostname=$(echo "${backend_url/https:\/\/}")
-
-sudo su - deploy << EOF
-  cat <<[-]EOF > /home/deploy/${instancia_add}/frontend/.env
+    sudo su - deploy << EOF
+        cat <<[-]EOF > /home/deploy/${instancia_add}/frontend/.env
 REACT_APP_BACKEND_URL=${backend_url}
 REACT_APP_BACKEND_PROTOCOL=https
 REACT_APP_BACKEND_HOST=${backend_hostname}
@@ -684,106 +608,43 @@ REACT_APP_TIMEZONE=America/Sao_Paulo
 REACT_APP_FACEBOOK_APP_ID=
 [-]EOF
 EOF
-
-  sleep 2
 }
 
 frontend_install() {
-  print_banner
-  printf "${WHITE} 💻 Instalando frontend...${GRAY_LIGHT}"
-  printf "\n\n"
+    log_message "Instalando frontend"
 
-  sleep 2
-
-  sudo su - deploy <<EOF
-  cd /home/deploy/${instancia_add}/frontend
-  npm install --legacy-peer-deps
-  npm run build
-  rm -rf src
+    sudo su - deploy <<EOF
+        cd /home/deploy/${instancia_add}/frontend
+        npm install --legacy-peer-deps
+        npm run build
+        rm -rf src
 EOF
-
-  sleep 2
 }
 
 frontend_nginx_setup() {
-  print_banner
-  printf "${WHITE} 💻 Configurando nginx (frontend)...${GRAY_LIGHT}"
-  printf "\n\n"
+    log_message "Configurando nginx (frontend)"
 
-  sleep 2
+    frontend_hostname=$(echo "${frontend_url/https:\/\/}")
 
-  frontend_hostname=$(echo "${frontend_url/https:\/\/}")
-
-sudo su - root << EOF
-cat > /etc/nginx/sites-available/${instancia_add}-frontend << 'END'
+    sudo su - root << EOF
+        cat > /etc/nginx/sites-available/${instancia_add}-frontend << 'END'
 server {
-  server_name $frontend_hostname;
-  
-  root /home/deploy/${instancia_add}/frontend/build;
-  index index.html;
+    server_name $frontend_hostname;
+    
+    root /home/deploy/${instancia_add}/frontend/build;
+    index index.html;
 
-  location / {
-      try_files \$uri /index.html;
-  }
+    location / {
+        try_files \$uri /index.html;
+    }
 }
 END
 
-ln -s /etc/nginx/sites-available/${instancia_add}-frontend /etc/nginx/sites-enabled
+        ln -s /etc/nginx/sites-available/${instancia_add}-frontend /etc/nginx/sites-enabled
 EOF
-
-  sleep 2
 }
 
-# Função principal de instalação
-install_autoatende() {
-  local installation_type=$1
-
-  if [[ $installation_type == "primary" ]]; then
-    system_update
-    system_node_install
-    system_redis_install
-    system_postgres_install
-    system_nginx_install
-    system_certbot_install
-    setup_firewall
-    system_create_user
-  fi
-
-  # Clone do repositório
-  sudo su - deploy <<EOF
-    git clone -b main https://lucassaud:${token_code}@github.com/AutoAtende/${repo_name}.git /home/deploy/${instancia_add}
-EOF
-
-  # Criar o manifest.json antes de tudo
-  create_manifest_json
-
-  # Configuração do backend
-  backend_postgres_create
-  backend_env_create
-  backend_install
-  backend_start_pm2
-  backend_nginx_setup
-
-  # Configuração do frontend
-  frontend_env_create
-  frontend_install
-  frontend_nginx_setup
-
-  # Configuração do SSL
-  backend_domain=$(echo "${backend_url/https:\/\/}")
-  frontend_domain=$(echo "${frontend_url/https:\/\/}")
-
-  sudo certbot --nginx -d $backend_domain -d $frontend_domain --non-interactive --agree-tos --email deploy@deploy.com
-
-  sudo systemctl restart nginx
-
-  print_banner
-  printf "${GREEN} ✅ Instalação concluída com sucesso!${NC}"
-  printf "\n\n"
-  sleep 2
-}
-
-# Função para otimizar o sistema (opcional)
+# Função para otimizar o sistema
 optimize_system() {
   print_banner
   printf "${WHITE} 💻 Otimizando o sistema...${GRAY_LIGHT}"
@@ -818,13 +679,29 @@ proxy_busy_buffers_size 256k;
 client_max_body_size 100M;
 EOF
 
-  # Otimizar Sistema
+  # Otimizar Sistema (kernel parameters)
   sudo tee -a /etc/sysctl.conf > /dev/null << EOF
+# Otimizações de Sistema de Arquivos
+fs.file-max = 2097152
+fs.nr_open = 1048576
+
+# Otimizações de Rede
 net.core.somaxconn = 65535
+net.core.netdev_max_backlog = 16384
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+net.nf_conntrack_max = 262144
+
+# Otimizações TCP
+net.ipv4.tcp_wmem = 4096 87380 16777216
+net.ipv4.tcp_rmem = 4096 87380 16777216
+net.ipv4.ip_forward = 1
+net.ipv4.conf.ens3.forwarding = 1
+net.ipv4.ip_nonlocal_bind = 1
+net.ipv4.tcp_tw_reuse = 1
 net.ipv4.tcp_max_syn_backlog = 65535
 net.ipv4.tcp_syncookies = 1
 net.ipv4.tcp_fin_timeout = 30
-net.ipv4.tcp_tw_reuse = 1
 EOF
 
   # Aplicar alterações
@@ -837,4 +714,50 @@ EOF
   printf "${GREEN} ✅ Sistema otimizado com sucesso!${NC}"
   printf "\n\n"
   sleep 2
+}
+
+# Função principal de instalação
+install_autoatende() {
+    local installation_type=$1
+
+    if [[ $installation_type == "primary" ]]; then
+        system_update
+        system_node_install
+        system_redis_install
+        system_postgres_install
+        system_nginx_install
+        system_certbot_install
+        setup_firewall
+        system_create_user
+    fi
+
+    # Clone do repositório
+    sudo su - deploy <<EOF
+        git clone -b main https://lucassaud:${token_code}@github.com/AutoAtende/Sys.git /home/deploy/${instancia_add}
+EOF
+
+    # Criar o manifest.json antes de tudo
+    create_manifest_json
+
+    # Configuração do backend
+    backend_postgres_create
+    backend_env_create
+    backend_install
+    backend_start_pm2
+    backend_nginx_setup
+
+    # Configuração do frontend
+    frontend_env_create
+    frontend_install
+    frontend_nginx_setup
+
+    # Configuração do SSL
+    backend_domain=$(echo "${backend_url/https:\/\/}")
+    frontend_domain=$(echo "${frontend_url/https:\/\/}")
+
+    sudo certbot --nginx -d $backend_domain -d $frontend_domain --non-interactive --agree-tos --email deploy@deploy.com
+
+    sudo systemctl restart nginx
+
+    log_message "Instalação concluída com sucesso!"
 }
