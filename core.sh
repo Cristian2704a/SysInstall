@@ -49,49 +49,49 @@ handle_error() {
 
 # Funções de coleta de dados
 get_mysql_root_password() {
-  print_banner
+  
   printf "${WHITE} 💻 Insira senha para o usuario Deploy e Banco de Dados (Não utilizar caracteres especiais):${GRAY_LIGHT}"
   printf "\n\n"
   read -p "> " mysql_root_password
 }
 
 get_token_code() {
-  print_banner
+  
   printf "${WHITE} 💻 Digite o token para baixar o código:${GRAY_LIGHT}"
   printf "\n\n"
   read -p "> " token_code
 }
 
 get_pwa_name() {
-  print_banner
+  
   printf "${WHITE} 💻 Digite o nome da empresa que será exibido no PWA:${GRAY_LIGHT}"
   printf "\n\n"
   read -p "> " pwa_name
 }
 
 get_instancia_add() {
-  print_banner
+  
   printf "${WHITE} 💻 Informe um nome para a Instancia/Empresa (Letras minúsculas, sem espaços/caracteres especiais):${GRAY_LIGHT}"
   printf "\n\n"
   read -p "> " instancia_add
 }
 
 get_frontend_url() {
-  print_banner
+  
   printf "${WHITE} 💻 Digite o domínio do FRONTEND/PAINEL para a ${instancia_add}:${GRAY_LIGHT}"
   printf "\n\n"
   read -p "> " frontend_url
 }
 
 get_backend_url() {
-  print_banner
+  
   printf "${WHITE} 💻 Digite o domínio do BACKEND/API para a ${instancia_add}:${GRAY_LIGHT}"
   printf "\n\n"
   read -p "> " backend_url
 }
 
 get_backend_port() {
-  print_banner
+  
   printf "${WHITE} 💻 Digite a porta do BACKEND para esta instancia (Ex: 4000 A 4999):${GRAY_LIGHT}"
   printf "\n\n"
   read -p "> " backend_port
@@ -646,7 +646,7 @@ EOF
 
 # Função para otimizar o sistema
 optimize_system() {
-  print_banner
+  
   printf "${WHITE} 💻 Otimizando o sistema...${GRAY_LIGHT}"
   printf "\n\n"
 
@@ -710,7 +710,7 @@ EOF
   sudo systemctl restart nginx
   sudo sysctl -p
 
-  print_banner
+  
   printf "${GREEN} ✅ Sistema otimizado com sucesso!${NC}"
   printf "\n\n"
   sleep 2

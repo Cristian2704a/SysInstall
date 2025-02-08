@@ -26,7 +26,7 @@ NC="\033[0m"
 
 # Menu principal
 get_install_type() {
-  print_banner
+  
   printf "${WHITE} 💻 Selecione o tipo de instalação:${GRAY_LIGHT}"
   printf "\n\n"
   printf "   [1] Instalação Primária (Primeira instalação no servidor)\n"
@@ -48,7 +48,7 @@ show_system_menu() {
   local installation_type=$1
   
   while true; do
-    print_banner
+    
     printf "${WHITE} 💻 Selecione a ação desejada:${GRAY_LIGHT}"
     printf "\n\n"
     printf "   [1] Instalar AutoAtende\n"
