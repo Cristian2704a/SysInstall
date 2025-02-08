@@ -49,49 +49,49 @@ handle_error() {
 
 # Funções de coleta de dados
 get_mysql_root_password() {
-  
+  print_banner
   printf "${WHITE} 💻 Insira senha para o usuario Deploy e Banco de Dados (Não utilizar caracteres especiais):${GRAY_LIGHT}"
   printf "\n\n"
   read -p "> " mysql_root_password
 }
 
 get_token_code() {
-  
+  print_banner
   printf "${WHITE} 💻 Digite o token para baixar o código:${GRAY_LIGHT}"
   printf "\n\n"
   read -p "> " token_code
 }
 
 get_pwa_name() {
-  
+  print_banner
   printf "${WHITE} 💻 Digite o nome da empresa que será exibido no PWA:${GRAY_LIGHT}"
   printf "\n\n"
   read -p "> " pwa_name
 }
 
 get_instancia_add() {
-  
+  print_banner
   printf "${WHITE} 💻 Informe um nome para a Instancia/Empresa (Letras minúsculas, sem espaços/caracteres especiais):${GRAY_LIGHT}"
   printf "\n\n"
   read -p "> " instancia_add
 }
 
 get_frontend_url() {
-  
+  print_banner
   printf "${WHITE} 💻 Digite o domínio do FRONTEND/PAINEL para a ${instancia_add}:${GRAY_LIGHT}"
   printf "\n\n"
   read -p "> " frontend_url
 }
 
 get_backend_url() {
-  
+  print_banner
   printf "${WHITE} 💻 Digite o domínio do BACKEND/API para a ${instancia_add}:${GRAY_LIGHT}"
   printf "\n\n"
   read -p "> " backend_url
 }
 
 get_backend_port() {
-  
+  print_banner
   printf "${WHITE} 💻 Digite a porta do BACKEND para esta instancia (Ex: 4000 A 4999):${GRAY_LIGHT}"
   printf "\n\n"
   read -p "> " backend_port
@@ -146,6 +146,7 @@ EOF
 
 # Função de remoção completa do sistema
 remove_complete_system() {
+    print_banner
     log_message "ATENÇÃO: Isso removerá completamente o sistema e todas as instâncias"
     read -p "Digite 'CONFIRMAR' para prosseguir com a remoção: " confirmation
 
@@ -250,6 +251,7 @@ EOF
 
 # Funções de sistema
 system_update() {
+    print_banner
     log_message "Atualizando o sistema"
     sudo apt-get -y update >> "$LOG_FILE" 2>&1 || handle_error "Falha na atualização do sistema"
     sudo apt-get -y upgrade >> "$LOG_FILE" 2>&1 || handle_error "Falha no upgrade do sistema"
@@ -257,6 +259,7 @@ system_update() {
 }
 
 system_create_user() {
+    print_banner
     log_message "Criando usuário deploy"
     useradd -m -p $(openssl passwd -6 ${mysql_root_password}) -s /bin/bash -G sudo deploy
     usermod -aG sudo deploy
@@ -271,6 +274,7 @@ EOF
 }
 
 setup_firewall() {
+    print_banner
     log_message "Configurando firewall"
     sudo ufw default deny incoming
     sudo ufw default allow outgoing
@@ -284,6 +288,7 @@ setup_firewall() {
 }
 
 system_node_install() {
+    print_banner
     log_message "Instalando Node.js 20 e PM2"
 
     # Instalar PM2 globalmente como root
@@ -314,6 +319,7 @@ EOF
 }
 
 system_redis_install() {
+    print_banner
     log_message "Instalando Redis"
 
     # Adicionar repositório do Redis
@@ -343,6 +349,7 @@ EOF
 }
 
 system_postgres_install() {
+    print_banner
     log_message "Instalando PostgreSQL"
 
     sudo apt install -y postgresql-common
@@ -355,6 +362,7 @@ system_postgres_install() {
 }
 
 system_nginx_install() {
+    print_banner
     log_message "Instalando nginx"
 
     sudo apt install -y nginx
