@@ -36,7 +36,7 @@ get_backend_url() {
 }
 
 set_default_variables() {
-  # Definindo valores padrão para variáveis que antes eram solicitadas
+
   max_whats=1000
   max_user=1000
   backend_port=4029
