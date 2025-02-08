@@ -147,15 +147,23 @@ EOF
 # Função de remoção completa do sistema
 remove_complete_system() {
     print_banner
-    log_message "ATENÇÃO: Isso removerá completamente o sistema e todas as instâncias"
-    read -p "Digite 'CONFIRMAR' para prosseguir com a remoção: " confirmation
+    printf "${WHITE} ⚠️ ATENÇÃO: Isso removerá completamente o sistema e todas as instâncias.${NC}"
+    printf "\n\n"
+    printf "${WHITE} Digite 'CONFIRMAR' para prosseguir com a remoção:${GRAY_LIGHT}"
+    printf "\n\n"
+    read -p "> " confirmation
 
     if [ "$confirmation" != "CONFIRMAR" ]; then
-        log_message "Operação cancelada pelo usuário"
-        return 1
+        print_banner
+        printf "${RED} ❌ Operação cancelada pelo usuário${NC}"
+        printf "\n\n"
+        sleep 2
+        return
     fi
 
-    log_message "Iniciando remoção completa do sistema"
+    print_banner
+    printf "${WHITE} 🗑️ Removendo sistema...${GRAY_LIGHT}"
+    printf "\n\n"
 
     # 1. Parar todos os processos PM2 primeiro
     log_message "Parando processos PM2..."
