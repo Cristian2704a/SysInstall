@@ -206,3 +206,106 @@ system_certbot_setup() {
 EOF
   sleep 2
 }
+
+#!/bin/bash
+
+software_delete() {
+  print_banner
+  printf "${WHITE} 💻 Digite o nome da instância que deseja remover:${GRAY_LIGHT}"
+  printf "\n\n"
+  read -p "> " instancia_delete
+  
+  if [ -z "$instancia_delete" ]; then
+    printf "\n${RED} ⚠️ O nome da instância não pode ficar vazio!${GRAY_LIGHT}"
+    printf "\n\n"
+    return
+  fi
+  
+  if [ ! -d "/home/deploy/${instancia_delete}" ]; then
+    printf "\n${RED} ⚠️ Instância não encontrada!${GRAY_LIGHT}"
+    printf "\n\n"
+    return
+  }
+  
+  print_banner
+  printf "${RED} ⚠️ ATENÇÃO! Esta operação irá remover completamente a instância ${instancia_delete}${GRAY_LIGHT}"
+  printf "\n\n"
+  printf "${RED} ⚠️ Isso inclui todos os dados, arquivos e configurações!${GRAY_LIGHT}"
+  printf "\n\n"
+  read -p "Tem certeza que deseja continuar? (y/N) " -n 1 -r
+  printf "\n\n"
+  
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    printf "${WHITE} ✔️ Operação cancelada!${GRAY_LIGHT}"
+    printf "\n\n"
+    return
+  fi
+  
+  # Parar e remover processos do PM2
+  sudo su - deploy <<EOF
+    pm2 stop ${instancia_delete}-backend
+    pm2 delete ${instancia_delete}-backend
+    pm2 save
+EOF
+  
+  # Remover banco de dados PostgreSQL
+  sudo su - postgres <<EOF
+    dropdb ${instancia_delete}
+    dropuser ${instancia_delete}
+EOF
+  
+  # Remover arquivos do sistema
+  sudo rm -rf /home/deploy/${instancia_delete}
+  
+  # Remover configurações do nginx
+  sudo rm -f /etc/nginx/sites-enabled/${instancia_delete}-backend
+  sudo rm -f /etc/nginx/sites-enabled/${instancia_delete}-frontend
+  sudo rm -f /etc/nginx/sites-available/${instancia_delete}-backend
+  sudo rm -f /etc/nginx/sites-available/${instancia_delete}-frontend
+  
+  # Recarregar nginx
+  sudo systemctl reload nginx
+  
+  print_banner
+  printf "${GREEN} ✅ Sistema removido com sucesso!${GRAY_LIGHT}"
+  printf "\n\n"
+  
+  # Se for a última instância, oferecer remoção completa
+  if [ -z "$(ls -A /home/deploy/)" ]; then
+    printf "${WHITE} 📝 Nenhuma outra instância encontrada. Deseja remover todos os programas instalados?${GRAY_LIGHT}"
+    printf "\n\n"
+    read -p "Remover programas? (y/N) " -n 1 -r
+    printf "\n\n"
+    
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+      # Remover PostgreSQL
+      sudo apt-get remove --purge -y postgresql*
+      
+      # Remover Redis
+      sudo apt-get remove --purge -y redis-server
+      
+      # Remover Nginx
+      sudo apt-get remove --purge -y nginx
+      
+      # Remover Node.js
+      sudo apt-get remove --purge -y nodejs
+      
+      # Remover PM2
+      sudo npm uninstall -g pm2
+      
+      # Remover certbot
+      sudo snap remove certbot
+      
+      # Remover usuário deploy
+      sudo userdel -r deploy
+      
+      # Limpar pacotes não utilizados
+      sudo apt-get autoremove -y
+      sudo apt-get clean
+      
+      print_banner
+      printf "${GREEN} ✅ Todos os programas foram removidos com sucesso!${GRAY_LIGHT}"
+      printf "\n\n"
+    fi
+  fi
+}

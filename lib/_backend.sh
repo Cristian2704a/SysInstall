@@ -17,23 +17,13 @@ backend_set_env() {
   printf "${WHITE} 💻 Configurando variáveis de ambiente (backend)...${GRAY_LIGHT}"
   printf "\n\n"
   sleep 2
-  
-  backend_url=$(echo "${backend_url/https:\/\/}")
-  backend_url=${backend_url%%/*}
-  backend_url=https://$backend_url
-  
-  frontend_url=$(echo "${frontend_url/https:\/\/}")
-  frontend_url=${frontend_url%%/*}
-  frontend_url=https://$frontend_url
-  
-  JWT_SECRET=$(openssl rand -hex 32)
-  JWT_REFRESH_SECRET=$(openssl rand -hex 32)
 
 sudo su - deploy << EOF
   cat <<[-]EOF > /home/deploy/${instancia_add}/backend/.env
 NODE_ENV=production
-BACKEND_URL=${backend_url}
-FRONTEND_URL=${frontend_url}
+BACKEND_URL=https://${frontend_url}/api
+FRONTEND_URL=https://${frontend_url}
+BACKEND_PUBLIC_PATH=/home/deploy/${instancia_add}/backend/public
 PORT=${backend_port}
 
 DB_HOST=localhost
@@ -43,10 +33,17 @@ DB_PASS=${mysql_root_password}
 DB_NAME=${instancia_add}
 DB_PORT=5432
 
+TIMEOUT_TO_IMPORT_MESSAGE=999
+FLUSH_REDIS_ON_START=true
+DEBUG_TRACE=false
+CHATBOT_RESTRICT_NUMBER=
+
 REDIS_URI=redis://:${mysql_root_password}@127.0.0.1:${redis_port}
 REDIS_HOST=127.0.0.1
 REDIS_PORT=${redis_port}
 REDIS_PASSWORD=${mysql_root_password}
+REDIS_OPT_LIMITER_MAX=1
+REDIS_OPT_LIMITER_DURATION=3000
 
 USER_LIMIT=${max_user}
 CONNECTIONS_LIMIT=${max_whats}
@@ -183,12 +180,14 @@ backend_nginx_setup() {
   printf "${WHITE} 💻 Configurando nginx (backend)...${GRAY_LIGHT}"
   printf "\n\n"
   sleep 2
-  backend_hostname=$(echo "${backend_url/https:\/\/}")
+  
 sudo su - root << EOF
 cat > /etc/nginx/sites-available/${instancia_add}-backend << 'END'
 server {
-  server_name $backend_hostname;
-  location / {
+  server_name $frontend_url;
+  
+  location /api {
+    rewrite ^/api(/.*)$ \$1 break;
     proxy_pass http://127.0.0.1:${backend_port};
     proxy_http_version 1.1;
     proxy_set_header Upgrade \$http_upgrade;
@@ -199,6 +198,14 @@ server {
     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     proxy_cache_bypass \$http_upgrade;
   }
+  
+  root /home/deploy/${instancia_add}/frontend/build;
+  index index.html;
+  
+  location / {
+    try_files \$uri /index.html;
+  }
+  
   location ~ /\.git {
     deny all;
   }
