@@ -22,7 +22,7 @@ system_node_install() {
   sudo su - root <<EOF
   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
   sudo apt install -y nodejs
-  sudo npm install -g npm@10.8.0
+  sudo npm install -g npm@latest
   
   # Instalando PostgreSQL 16
   sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt \$(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
@@ -196,14 +196,13 @@ system_certbot_setup() {
   printf "${WHITE} 💻 Configurando certbot, Já estamos perto do fim...${GRAY_LIGHT}"
   printf "\n\n"
   sleep 2
-  backend_domain=$(echo "${backend_url/https:\/\/}")
   frontend_domain=$(echo "${frontend_url/https:\/\/}")
   sudo su - root <<EOF
   certbot -m $deploy_email \
           --nginx \
           --agree-tos \
           --non-interactive \
-          --domains $backend_domain,$frontend_domain
+          --domains $frontend_domain
 EOF
   sleep 2
 }
