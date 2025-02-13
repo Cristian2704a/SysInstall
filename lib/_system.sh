@@ -209,7 +209,7 @@ EOF
 
 #!/bin/bash
 
-software_delete() {
+system_delete() {
   print_banner
   printf "${WHITE} 💻 Digite o nome da instância que deseja remover:${GRAY_LIGHT}"
   printf "\n\n"
@@ -225,7 +225,7 @@ software_delete() {
     printf "\n${RED} ⚠️ Instância não encontrada!${GRAY_LIGHT}"
     printf "\n\n"
     return
-  }
+  fi
   
   print_banner
   printf "${RED} ⚠️ ATENÇÃO! Esta operação irá remover completamente a instância ${instancia_delete}${GRAY_LIGHT}"

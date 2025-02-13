@@ -138,7 +138,7 @@ inquiry_options() {
       show_vars
       ;;
     2)
-      software_delete
+      system_delete
       exit
       ;;
     *)
