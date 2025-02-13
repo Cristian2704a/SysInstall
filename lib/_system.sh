@@ -207,3 +207,24 @@ system_certbot_setup() {
 EOF
   sleep 2
 }
+
+system_check_node_version() {
+  print_banner
+  printf "${WHITE} 💻 Verificando versão do Node.js...${GRAY_LIGHT}"
+  printf "\n\n"
+  
+  if ! command -v node &> /dev/null; then
+    printf "${RED} ⚠️ Node.js não encontrado. Instalando...${GRAY_LIGHT}\n"
+    system_node_install
+    return
+  fi
+  
+  CURRENT_NODE_VERSION=$(node -v | sed 's/v\([0-9]*\).*/\1/')
+  if [[ ! "$CURRENT_NODE_VERSION" =~ ^[0-9]+$ ]] || [ "$CURRENT_NODE_VERSION" -lt 18 ]; then
+    printf "${RED} ⚠️ Versão do Node.js ($CURRENT_NODE_VERSION) incompatível. Atualizando...${GRAY_LIGHT}\n"
+    system_node_install
+  else
+    printf "${GREEN} ✅ Versão do Node.js ($CURRENT_NODE_VERSION) compatível.${GRAY_LIGHT}\n"
+  fi
+  sleep 2
+}

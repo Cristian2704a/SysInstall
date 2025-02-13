@@ -109,6 +109,138 @@ get_urls() {
   set_default_variables
 }
 
+software_update() {
+  print_banner
+  printf "${WHITE} 💻 Atualizando o AutoAtende...${GRAY_LIGHT}"
+  printf "\n\n"
+  sleep 2
+
+  # Verificar se existe uma instalação
+  if [ ! -d "/home/deploy" ]; then
+    printf "${RED} ⚠️ Nenhuma instalação do AutoAtende encontrada!${GRAY_LIGHT}"
+    printf "\n\n"
+    exit 1
+  fi
+
+  # Encontrar todas as instâncias
+  instances=$(find /home/deploy -maxdepth 1 -type d -not -name "deploy")
+  
+  if [ -z "$instances" ]; then
+    printf "${RED} ⚠️ Nenhuma instância encontrada!${GRAY_LIGHT}"
+    printf "\n\n"
+    exit 1
+  fi
+
+  # Listar instâncias disponíveis
+  printf "${WHITE} Instâncias disponíveis:${GRAY_LIGHT}\n\n"
+  i=1
+  declare -A instance_map
+  for instance in $instances; do
+    instance_name=$(basename "$instance")
+    instance_map[$i]=$instance_name
+    printf "$i) $instance_name\n"
+    ((i++))
+  done
+
+  # Solicitar escolha da instância
+  printf "\n${WHITE} Escolha o número da instância para atualizar:${GRAY_LIGHT}\n"
+  read -p "> " choice
+
+  if [[ ! $choice =~ ^[0-9]+$ ]] || [ $choice -lt 1 ] || [ $choice -ge $i ]; then
+    printf "\n${RED} ⚠️ Opção inválida!${GRAY_LIGHT}\n\n"
+    exit 1
+  fi
+
+  selected_instance=${instance_map[$choice]}
+  
+  # Atualizar a instância selecionada
+  cd /home/deploy/$selected_instance
+
+  # Backup do manifest.json
+  if [ -f "frontend/public/manifest.json" ]; then
+    cp frontend/public/manifest.json /tmp/manifest.json
+  fi
+
+  # Atualizar código
+  git fetch origin
+  git reset --hard origin/main
+  git pull origin main
+
+  # Restaurar manifest.json
+  if [ -f "/tmp/manifest.json" ]; then
+    cp /tmp/manifest.json frontend/public/manifest.json
+  fi
+
+  # Atualizar backend
+  cd backend
+  pm2 stop "$selected_instance-backend"
+  rm -rf node_modules
+  npm install
+  npm run build
+  cp .env dist/
+  npx sequelize db:migrate
+  NODE_ENV=production pm2 start "$selected_instance-backend" --update-env
+  rm -rf src
+  cd ..
+
+  # Atualizar frontend
+  cd frontend
+  rm -rf node_modules
+  npm install --legacy-peer-deps
+  npm run build
+  rm -rf src
+  cd ..
+
+  # Limpar logs do PM2
+  pm2 flush
+
+  printf "\n${GREEN} ✅ Atualização concluída com sucesso!${GRAY_LIGHT}\n\n"
+}
+
+software_delete() {
+  print_banner
+  printf "${WHITE} 💻 Sistema de remoção do AutoAtende${GRAY_LIGHT}"
+  printf "\n\n"
+  
+  # Verificar se existe uma instalação
+  if [ ! -d "/home/deploy" ]; then
+    printf "${RED} ⚠️ Nenhuma instalação do AutoAtende encontrada!${GRAY_LIGHT}"
+    printf "\n\n"
+    exit 1
+  fi
+
+  printf "${RED} ⚠️ ATENÇÃO: Esta operação irá remover completamente o AutoAtende!${GRAY_LIGHT}"
+  printf "\n\n"
+  read -p "Tem certeza que deseja continuar? (y/N) " -n 1 -r
+  printf "\n\n"
+
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    printf "${RED} ⚠️ Operação cancelada!${GRAY_LIGHT}"
+    printf "\n\n"
+    exit 1
+  fi
+
+  # Encontrar todas as instâncias
+  instances=$(find /home/deploy -maxdepth 1 -type d -not -name "deploy")
+  
+  # Parar e remover instâncias do PM2
+  for instance in $instances; do
+    instance_name=$(basename "$instance")
+    pm2 delete "$instance_name-backend" 2>/dev/null
+  done
+
+  # Remover arquivos e diretórios
+  sudo rm -rf /home/deploy
+  sudo userdel -r deploy 2>/dev/null
+  sudo rm -rf /etc/nginx/sites-available/autoatende*
+  sudo rm -rf /etc/nginx/sites-enabled/autoatende*
+  
+  # Reiniciar serviços
+  sudo systemctl restart nginx
+
+  printf "\n${GREEN} ✅ AutoAtende removido com sucesso!${GRAY_LIGHT}\n\n"
+}
+
 show_vars() {
   print_banner
   printf "${WHITE} 📝 Confira os dados informados:${GRAY_LIGHT}"
@@ -137,7 +269,8 @@ inquiry_options() {
   printf "${WHITE} 💻 Bem vindo(a) ao AutoAtende! Selecione uma opção:${GRAY_LIGHT}"
   printf "\n\n"
   printf "   [1] Instalar AutoAtende\n"
-  printf "   [2] Remover AutoAtende\n"
+  printf "   [2] Atualizar AutoAtende\n"
+  printf "   [3] Remover AutoAtende\n"
   printf "\n"
   read -p "> " option
 
@@ -147,6 +280,10 @@ inquiry_options() {
       show_vars
       ;;
     2)
+      software_update
+      exit
+      ;;
+    3)
       software_delete
       exit
       ;;

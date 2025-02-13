@@ -20,7 +20,7 @@ check_previous_installation() {
   printf "${WHITE} 💻 Verificando instalações existentes...${GRAY_LIGHT}"
   printf "\n\n"
 
-  if [ -d "/home/deploy" ]; then
+  if [ -d "/home/deploy" ] && [ "$1" != "update" ]; then
     printf "${RED} ⚠️ Foi detectada uma instalação existente do AutoAtende!${GRAY_LIGHT}"
     printf "\n\n"
     printf "${WHITE} O AutoAtende só pode ter uma instalação por servidor.${GRAY_LIGHT}"
@@ -31,62 +31,67 @@ check_previous_installation() {
   fi
 }
 
-# Verificar instalação existente
-check_previous_installation
+# Verificar instalação existente apenas se não for atualização
+if [ "$1" != "update" ]; then
+  check_previous_installation
+fi
 
 # interactive CLI
 inquiry_options
 
-# system installation
-system_update
-system_node_install
-system_redis_install
-system_pm2_install
-system_fail2ban_install
-system_fail2ban_conf
-system_firewall_conf
-system_nginx_install
-system_certbot_install
+# Se a opção escolhida foi instalar, continua com a instalação
+if [ "$option" = "1" ]; then
+  # system installation
+  system_update
+  system_node_install
+  system_redis_install
+  system_pm2_install
+  system_fail2ban_install
+  system_fail2ban_conf
+  system_firewall_conf
+  system_nginx_install
+  system_certbot_install
 
-# system config
-system_create_user
+  # system config
+  system_create_user
 
-# backend related
-system_git_clone
-backend_set_env
-backend_redis_setup
-backend_node_dependencies
-backend_node_build
-backend_db_migrate
-backend_db_seed
-backend_start_pm2
-backend_nginx_setup
+  # backend related
+  system_git_clone
+  backend_set_env
+  backend_redis_setup
+  backend_node_dependencies
+  backend_node_build
+  backend_db_migrate
+  backend_db_seed
+  backend_start_pm2
+  backend_nginx_setup
 
-# frontend related
-frontend_setup
+  # frontend related
+  frontend_setup
 
-# network related
-system_nginx_conf
-system_nginx_restart
-system_certbot_setup
+  # network related
+  system_nginx_conf
+  system_nginx_restart
+  system_certbot_setup
 
-# Final instructions
-print_banner
-printf "${GREEN} ✅ Instalação do AutoAtende concluída com sucesso!${GRAY_LIGHT}"
-printf "\n\n"
-printf "${WHITE} 📝 Informações de acesso:${GRAY_LIGHT}"
-printf "\n\n"
-printf "${WHITE} Frontend: ${GRAY_LIGHT}${frontend_url}"
-printf "\n"
-printf "${WHITE} Backend: ${GRAY_LIGHT}${backend_url}"
-printf "\n\n"
-printf "${WHITE} Guarde estas informações em um local seguro!${GRAY_LIGHT}"
-printf "\n\n"
-printf "${WHITE} Para acessar o sistema, utilize:${GRAY_LIGHT}"
-printf "\n"
-printf "${WHITE} Usuário: ${GRAY_LIGHT}admin@autoatende.com.br"
-printf "\n"
-printf "${WHITE} Senha: ${GRAY_LIGHT}123456"
-printf "\n\n"
-printf "${RED} ⚠️ IMPORTANTE: Altere a senha padrão após o primeiro acesso!${GRAY_LIGHT}"
-printf "\n\n"
+  # Final instructions
+  print_banner
+  printf "${GREEN} ✅ Instalação do AutoAtende concluída com sucesso!${GRAY_LIGHT}"
+  printf "\n\n"
+  printf "${WHITE} 📝 Informações de acesso:${GRAY_LIGHT}"
+  printf "\n\n"
+  printf "${WHITE} Frontend: ${GRAY_LIGHT}${frontend_url}"
+  printf "\n"
+  printf "${WHITE} Backend: ${GRAY_LIGHT}${backend_url}"
+  printf "\n\n"
+  printf "${WHITE} Guarde estas informações em um local seguro!${GRAY_LIGHT}"
+  printf "\n\n"
+  printf "${WHITE} Para acessar o sistema, utilize:${GRAY_LIGHT}"
+  printf "\n"
+  printf "${WHITE} Usuário: ${GRAY_LIGHT}admin@autoatende.com.br"
+  printf "\n"
+  printf "${WHITE} Senha: ${GRAY_LIGHT}123456"
+  printf "\n\n"
+  printf "${RED} ⚠️ IMPORTANTE: Altere a senha padrão após o primeiro acesso!${GRAY_LIGHT}"
+  printf "\n\n"
+fi
