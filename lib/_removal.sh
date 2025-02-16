@@ -1,5 +1,25 @@
 #!/bin/bash
 
+clean_redis() {
+    printf "\n${WHITE} 🗑️ Limpando Redis...${GRAY_LIGHT}"
+    
+    # Encontrar a primeira pasta dentro de /home/deploy
+    instance_dir=$(ls -d /home/deploy/*/ 2>/dev/null | head -n 1)
+    
+    if [ ! -z "$instance_dir" ]; then
+        # Extrair a senha do Redis do arquivo .env
+        env_file="${instance_dir}backend/.env"
+        if [ -f "$env_file" ]; then
+            redis_password=$(grep "REDIS_PASSWORD=" "$env_file" | cut -d '=' -f2)
+            
+            if [ ! -z "$redis_password" ]; then
+                # Limpar Redis com autenticação
+                redis-cli -a "$redis_password" FLUSHALL
+            fi
+        fi
+    fi
+}
+
 software_delete() {
     print_banner
     printf "${WHITE} 💻 Removendo instalação existente do AutoAtende...${GRAY_LIGHT}"
@@ -45,13 +65,8 @@ EOF
         fi
     fi
 
-    # Remover Redis
-    printf "\n${WHITE} 🗑️ Limpando Redis...${GRAY_LIGHT}"
-    if command -v redis-cli &>/dev/null; then
-        # Tentar limpar o Redis mesmo se não souber a senha
-        redis-cli FLUSHALL || true
-        sudo systemctl restart redis-server
-    fi
+    # Limpar Redis usando a nova função
+    clean_redis
 
     # Remover diretórios e usuário deploy
     printf "\n${WHITE} 🗑️ Removendo arquivos e usuário deploy...${GRAY_LIGHT}"
