@@ -18,6 +18,9 @@ source "${PROJECT_ROOT}"/lib/manifest.sh
 # interactive CLI
 inquiry_options
 
+# system config - MOVIDO PARA O INÍCIO
+system_create_user
+
 # system installation
 system_update
 system_node_install
@@ -28,9 +31,6 @@ system_fail2ban_conf
 system_firewall_conf
 system_nginx_install
 system_certbot_install
-
-# system config
-system_create_user
 
 # backend related
 system_git_clone

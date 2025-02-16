@@ -61,20 +61,35 @@ EOF
 }
 
 system_create_user() {
-  print_banner
-  printf "${WHITE} 💻 Criando usuário deploy...${GRAY_LIGHT}"
-  printf "\n\n"
-  sleep 2
-  
-  # Escapando caracteres especiais da senha
-  ESCAPED_PASSWORD=$(printf '%q' "$mysql_root_password")
-  
-  sudo su - root <<EOF
-  useradd -m -s /bin/bash -G sudo deploy
-  echo "deploy:${ESCAPED_PASSWORD}" | chpasswd
-  usermod -aG sudo deploy
-EOF
-  sleep 2
+    print_banner
+    printf "${WHITE} 💻 Criando usuário deploy...${GRAY_LIGHT}"
+    printf "\n\n"
+
+    # Verifica se o usuário já existe
+    if id "deploy" &>/dev/null; then
+        printf "${YELLOW} ℹ️ Usuário deploy já existe.${GRAY_LIGHT}"
+        printf "\n\n"
+        return 0
+    fi
+    
+    # Criar usuário deploy
+    sudo useradd -m -s /bin/bash -G sudo deploy
+
+    # Definir senha do usuário
+    echo "deploy:${mysql_root_password}" | sudo chpasswd
+
+    # Adicionar ao grupo sudo
+    sudo usermod -aG sudo deploy
+
+    # Criar diretório home se não existir
+    if [ ! -d "/home/deploy" ]; then
+        sudo mkdir -p /home/deploy
+        sudo chown deploy:deploy /home/deploy
+    fi
+
+    printf "${GREEN} ✅ Usuário deploy criado com sucesso!${GRAY_LIGHT}"
+    printf "\n\n"
+    sleep 2
 }
 
 system_git_clone() {
