@@ -33,8 +33,11 @@ sudo su - deploy << EOF
   cat <<[-]EOF > /home/deploy/${instancia_add}/backend/.env
 NODE_ENV=production
 BACKEND_URL=${backend_url}
+BACKEND_PUBLIC_PATH=/home/deploy/${instancia_add}/backend/public
+BACKEND_SESSION_PATH=/home/deploy/${instancia_add}/backend/metadados
 FRONTEND_URL=${frontend_url}
 PORT=${backend_port}
+PROXY_PORT=443
 
 DB_HOST=localhost
 DB_DIALECT=postgres
@@ -43,10 +46,17 @@ DB_PASS=${mysql_root_password}
 DB_NAME=${instancia_add}
 DB_PORT=5432
 
+TIMEOUT_TO_IMPORT_MESSAGE=999
+FLUSH_REDIS_ON_START=false
+DEBUG_TRACE=true
+CHATBOT_RESTRICT_NUMBER=
+
 REDIS_URI=redis://:${mysql_root_password}@127.0.0.1:${redis_port}
 REDIS_HOST=127.0.0.1
 REDIS_PORT=${redis_port}
 REDIS_PASSWORD=${mysql_root_password}
+REDIS_OPT_LIMITER_MAX=1
+REDIS_OPT_LIMITER_DURATION=3000
 
 USER_LIMIT=${max_user}
 CONNECTIONS_LIMIT=${max_whats}
@@ -67,25 +77,27 @@ backend_node_dependencies() {
 sudo su - deploy <<EOF
 cd /home/deploy/${instancia_add}/backend
 mkdir logs
-chmod 777 logs
+chmod 775 logs
+mkdir metadados
+chmod 775 metadados
 mkdir public
-chmod 777 public
+chmod 775 public
 mkdir -p public/company1
-chmod 777 public/company1
+chmod 775 public/company1
 mkdir -p public/company1/medias
-chmod 777 public/company1/medias
+chmod 775 public/company1/medias
 mkdir -p public/company1/tasks
-chmod 777 public/company1/tasks
+chmod 775 public/company1/tasks
 mkdir -p public/company1/announcements
-chmod 777 public/company1/announcements
+chmod 775 public/company1/announcements
 mkdir -p public/company1/logos
-chmod 777 public/company1/logos
+chmod 775 public/company1/logos
 mkdir -p public/company1/backgrounds
-chmod 777 public/company1/backgrounds
+chmod 775 public/company1/backgrounds
 mkdir -p public/company1/quickMessages
-chmod 777 public/company1/quickMessages
+chmod 775 public/company1/quickMessages
 mkdir -p public/company1/profile
-chmod 777 public/company1/profile
+chmod 775 public/company1/profile
 npm install
 EOF
 
