@@ -15,25 +15,6 @@ source "${PROJECT_ROOT}"/variables/manifest.sh
 source "${PROJECT_ROOT}"/utils/manifest.sh
 source "${PROJECT_ROOT}"/lib/manifest.sh
 
-check_previous_installation() {
-  print_banner
-  printf "${WHITE} 💻 Verificando instalações existentes...${GRAY_LIGHT}"
-  printf "\n\n"
-
-  if [ -d "/home/deploy" ]; then
-    printf "${RED} ⚠️ Foi detectada uma instalação existente do AutoAtende!${GRAY_LIGHT}"
-    printf "\n\n"
-    printf "${WHITE} O AutoAtende só pode ter uma instalação por servidor.${GRAY_LIGHT}"
-    printf "\n\n"
-    printf "${WHITE} Para prosseguir, você precisa remover a instalação atual.${GRAY_LIGHT}"
-    printf "\n\n"
-    exit 1
-  fi
-}
-
-# Verificar instalação existente
-check_previous_installation
-
 # interactive CLI
 inquiry_options
 

@@ -143,8 +143,11 @@ inquiry_options() {
 
   case "${option}" in
     1) 
-      get_urls
-      show_vars
+      check_previous_installation
+      if [ $? -eq 0 ]; then
+        get_urls
+        show_vars
+      fi
       ;;
     2)
       software_delete
@@ -157,4 +160,21 @@ inquiry_options() {
       inquiry_options
       ;;
   esac
+}
+
+check_previous_installation() {
+  print_banner
+  printf "${WHITE} 💻 Verificando instalações existentes...${GRAY_LIGHT}"
+  printf "\n\n"
+
+  if [ -d "/home/deploy" ] && [ ! -z "$(ls -A /home/deploy/)" ]; then
+    printf "${RED} ⚠️ Foi detectada uma instalação existente do AutoAtende!${GRAY_LIGHT}"
+    printf "\n\n"
+    printf "${WHITE} O AutoAtende só pode ter uma instalação por servidor.${GRAY_LIGHT}"
+    printf "\n\n"
+    printf "${WHITE} Por favor, use a opção 2 no menu principal para remover a instalação atual antes de prosseguir.${GRAY_LIGHT}"
+    printf "\n\n"
+    return 1
+  fi
+  return 0
 }
