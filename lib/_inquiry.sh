@@ -133,33 +133,37 @@ show_vars() {
 }
 
 inquiry_options() {
-  print_banner
-  printf "${WHITE} 💻 Bem vindo(a) ao AutoAtende! Selecione uma opção:${GRAY_LIGHT}"
-  printf "\n\n"
-  printf "   [1] Instalar AutoAtende\n"
-  printf "   [2] Remover AutoAtende\n"
-  printf "\n"
-  read -p "> " option
+    print_banner
+    printf "${WHITE} 💻 Bem vindo(a) ao AutoAtende! Selecione uma opção:${GRAY_LIGHT}"
+    printf "\n\n"
+    printf "   [1] Instalar AutoAtende\n"
+    printf "   [2] Remover AutoAtende\n"
+    printf "\n"
+    read -p "> " option
 
-  case "${option}" in
-    1) 
-      check_previous_installation
-      if [ $? -eq 0 ]; then
-        get_urls
-        show_vars
-      fi
-      ;;
-    2)
-      software_delete
-      exit
-      ;;
-    *)
-      printf "${RED} ⚠️ Opção inválida!${GRAY_LIGHT}"
-      printf "\n\n"
-      sleep 2
-      inquiry_options
-      ;;
-  esac
+    case "${option}" in
+        1) 
+            if [ -d "/home/deploy" ] && [ ! -z "$(ls -A /home/deploy/)" ]; then
+                printf "\n${RED} ⚠️ Foi detectada uma instalação existente do AutoAtende!${GRAY_LIGHT}"
+                printf "\n${WHITE} Use a opção 2 para remover a instalação atual antes de prosseguir.${GRAY_LIGHT}"
+                printf "\n\n"
+                read -p "Pressione ENTER para voltar ao menu principal..."
+                inquiry_options
+            else
+                get_urls
+                show_vars
+            fi
+            ;;
+        2)
+            software_delete
+            ;;
+        *)
+            printf "\n${RED} ⚠️ Opção inválida!${GRAY_LIGHT}"
+            printf "\n\n"
+            sleep 2
+            inquiry_options
+            ;;
+    esac
 }
 
 check_previous_installation() {
