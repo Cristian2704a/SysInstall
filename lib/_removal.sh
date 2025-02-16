@@ -17,7 +17,7 @@ software_delete() {
     # Parar todos os serviços primeiro
     printf "\n${WHITE} 🛑 Parando serviços...${GRAY_LIGHT}"
     if id "deploy" &>/dev/null; then
-        sudo su - deploy <<EOF
+        sudo su - deploy <<EOF || true
         pm2 delete all
         pm2 save
         pm2 cleardump
@@ -26,23 +26,31 @@ EOF
 
     # Remover Nginx sites
     printf "\n${WHITE} 🗑️ Removendo configurações do Nginx...${GRAY_LIGHT}"
-    sudo rm -rf /etc/nginx/sites-enabled/*
-    sudo rm -rf /etc/nginx/sites-available/*
+    sudo find /etc/nginx/sites-enabled/ -type l -delete
+    sudo find /etc/nginx/sites-available/ -type f -delete
     sudo systemctl restart nginx
 
     # Remover bancos de dados e usuário PostgreSQL
     printf "\n${WHITE} 🗑️ Removendo bancos de dados...${GRAY_LIGHT}"
     if command -v psql &>/dev/null; then
-        sudo su - postgres <<EOF
-        psql -c "DROP DATABASE IF EXISTS $(ls -1 /home/deploy 2>/dev/null);"
-        psql -c "DROP ROLE IF EXISTS $(ls -1 /home/deploy 2>/dev/null);"
+        # Obter lista de instâncias
+        instances=$(ls -1 /home/deploy 2>/dev/null)
+        if [ ! -z "$instances" ]; then
+            for instance in $instances; do
+                sudo su - postgres <<EOF
+                dropdb --if-exists ${instance}
+                dropuser --if-exists ${instance}
 EOF
+            done
+        fi
     fi
 
     # Remover Redis
     printf "\n${WHITE} 🗑️ Limpando Redis...${GRAY_LIGHT}"
     if command -v redis-cli &>/dev/null; then
-        redis-cli FLUSHALL
+        # Tentar limpar o Redis mesmo se não souber a senha
+        redis-cli FLUSHALL || true
+        sudo systemctl restart redis-server
     fi
 
     # Remover diretórios e usuário deploy
@@ -51,14 +59,19 @@ EOF
         # Matar todos os processos do usuário deploy
         sudo pkill -u deploy || true
         
+        # Remover PM2 startup
+        sudo su - deploy <<EOF || true
+        pm2 unstartup
+EOF
+        
         # Remover diretório home e usuário
         sudo rm -rf /home/deploy
-        sudo userdel -f -r deploy
+        sudo userdel -f deploy
     fi
 
     # Remover PM2
     printf "\n${WHITE} 🗑️ Removendo PM2...${GRAY_LIGHT}"
-    sudo npm uninstall -g pm2
+    sudo npm uninstall -g pm2 || true
 
     printf "\n${GREEN} ✅ AutoAtende removido com sucesso!${GRAY_LIGHT}"
     printf "\n\n"
