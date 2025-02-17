@@ -78,10 +78,6 @@ frontend_set_env() {
   printf "${WHITE} 💻 Configurando variáveis de ambiente (frontend)...${GRAY_LIGHT}"
   printf "\n\n"
   sleep 2
-  
-  backend_url=$(echo "${backend_url/https:\/\/}")
-  backend_url=${backend_url%%/*}
-  backend_url=https://$backend_url
 
   frontend_url=$(echo "${frontend_url/https:\/\/}")
   frontend_url=${frontend_url%%/*}
@@ -92,7 +88,7 @@ sudo su - deploy << EOF1
 REACT_APP_BACKEND_URL=${backend_url}
 REACT_APP_FRONTEND_URL=${frontend_url}
 REACT_APP_BACKEND_PROTOCOL=https
-REACT_APP_BACKEND_HOST=${backend_url#*//}
+REACT_APP_BACKEND_HOST=${frontend_url}
 REACT_APP_BACKEND_PORT=443
 REACT_APP_HOURS_CLOSE_TICKETS_AUTO=24
 REACT_APP_LOCALE=pt-br
@@ -102,35 +98,10 @@ EOF1
   sleep 2
 }
 
-frontend_nginx_setup() {
-  print_banner
-  printf "${WHITE} 💻 Configurando nginx (frontend)...${GRAY_LIGHT}"
-  printf "\n\n"
-  sleep 2
-  frontend_hostname=$(echo "${frontend_url/https:\/\/}")
-sudo su - root << EOF
-cat > /etc/nginx/sites-available/${instancia_add}-frontend << 'END'
-server {
-  server_name $frontend_hostname;
-  root /home/deploy/${instancia_add}/frontend/build;
-  index index.html;
-  location / {
-    try_files \$uri /index.html;
-  }
-  location ~ /\.git {
-    deny all;
-  }
-}
-END
-ln -s /etc/nginx/sites-available/${instancia_add}-frontend /etc/nginx/sites-enabled
-EOF
-  sleep 2
-}
 
 frontend_setup() {
   frontend_set_env
   frontend_create_manifest
   frontend_node_dependencies
   frontend_node_build
-  frontend_nginx_setup
 }

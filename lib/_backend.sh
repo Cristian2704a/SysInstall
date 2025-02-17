@@ -17,21 +17,11 @@ backend_set_env() {
   printf "${WHITE} 💻 Configurando variáveis de ambiente (backend)...${GRAY_LIGHT}"
   printf "\n\n"
   sleep 2
-  
-  backend_url=$(echo "${backend_url/https:\/\/}")
-  backend_url=${backend_url%%/*}
-  backend_url=https://$backend_url
-  
-  frontend_url=$(echo "${frontend_url/https:\/\/}")
-  frontend_url=${frontend_url%%/*}
-  frontend_url=https://$frontend_url
-  
-  JWT_SECRET=$(openssl rand -hex 32)
-  JWT_REFRESH_SECRET=$(openssl rand -hex 32)
 
 sudo su - deploy << EOF
   cat <<[-]EOF > /home/deploy/${instancia_add}/backend/.env
 NODE_ENV=production
+
 BACKEND_URL=${backend_url}
 BACKEND_PUBLIC_PATH=/home/deploy/${instancia_add}/backend/public
 BACKEND_SESSION_PATH=/home/deploy/${instancia_add}/backend/metadados
@@ -195,12 +185,14 @@ backend_nginx_setup() {
   printf "${WHITE} 💻 Configurando nginx (backend)...${GRAY_LIGHT}"
   printf "\n\n"
   sleep 2
-  backend_hostname=$(echo "${backend_url/https:\/\/}")
+  
 sudo su - root << EOF
 cat > /etc/nginx/sites-available/${instancia_add}-backend << 'END'
 server {
-  server_name $backend_hostname;
-  location / {
+  server_name $frontend_url;
+  
+  location /api {
+    rewrite ^/api(/.*)$ \$1 break;
     proxy_pass http://127.0.0.1:${backend_port};
     proxy_http_version 1.1;
     proxy_set_header Upgrade \$http_upgrade;
@@ -211,6 +203,14 @@ server {
     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     proxy_cache_bypass \$http_upgrade;
   }
+  
+  root /home/deploy/${instancia_add}/frontend/build;
+  index index.html;
+  
+  location / {
+    try_files \$uri /index.html;
+  }
+  
   location ~ /\.git {
     deny all;
   }
