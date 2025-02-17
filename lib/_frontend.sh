@@ -98,10 +98,40 @@ EOF1
   sleep 2
 }
 
+frontend_nginx_setup() {
+  print_banner
+  printf "${WHITE} 💻 Configurando nginx (frontend)...${GRAY_LIGHT}"
+  printf "\n\n"
+
+  sleep 2
+
+  frontend_hostname=$(echo "${frontend_url/https:\/\/}")
+
+sudo su - root << EOF
+cat > /etc/nginx/sites-available/${instancia_add}-frontend << 'END'
+server {
+  server_name $frontend_hostname;
+  
+  root /home/deploy/${instancia_add}/frontend/build;
+  index index.html;
+
+  location / {
+    try_files \$uri /index.html;
+  }
+}
+END
+
+ln -s /etc/nginx/sites-available/${instancia_add}-frontend /etc/nginx/sites-enabled
+EOF
+
+  sleep 2
+}
+
 
 frontend_setup() {
   frontend_set_env
   frontend_create_manifest
   frontend_node_dependencies
   frontend_node_build
+  frontend_nginx_setup
 }

@@ -68,7 +68,7 @@ get_token_code() {
 
 get_frontend_url() {
   print_banner
-  printf "${WHITE} 💻 Digite o domínio do sistema (ex: seudominio.com.br):${GRAY_LIGHT}"
+  printf "${WHITE} 💻 Digite a url do frontend (ex: app.seudominio.com.br):${GRAY_LIGHT}"
   printf "\n\n"
   read -p "> " frontend_url
 
@@ -78,11 +78,21 @@ get_frontend_url() {
     get_frontend_url
   fi
   
-  # Define backend_url como o mesmo domínio
-  backend_url="$frontend_url"
 }
 
+get_backend_url() {
+  print_banner
+  printf "${WHITE} 💻 Digite a url do backend (ex: api.seudominio.com.br):${GRAY_LIGHT}"
+  printf "\n\n"
+  read -p "> " backend_url
 
+  if [[ ! $backend_url =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+    printf "\n${RED} ⚠️ Domínio inválido!${GRAY_LIGHT}"
+    printf "\n\n"
+    get_backend_url
+  fi
+  
+}
 
 set_default_variables() {
   max_whats=1000
@@ -97,6 +107,7 @@ get_urls() {
   get_instancia_add
   get_empresa_nome
   get_frontend_url
+  get_backend_url
   set_default_variables
 }
 

@@ -110,7 +110,7 @@ system_git_clone() {
   printf "\n\n"
   sleep 2
 sudo su - deploy <<EOF
-  git clone -b main https://lucassaud:${token_code}@github.com/AutoAtende/Sys.git /home/deploy/${instancia_add}
+  git clone -b dev-02-2025 https://lucassaud:${token_code}@github.com/AutoAtende/Sys.git /home/deploy/${instancia_add}
 EOF
   sleep 2
 }
@@ -224,12 +224,13 @@ system_certbot_setup() {
   printf "\n\n"
   sleep 2
   frontend_domain=$(echo "${frontend_url/https:\/\/}")
+  backend_domain=$(echo "${backend_url/https:\/\/}")
   sudo su - root <<EOF
   certbot -m $deploy_email \
           --nginx \
           --agree-tos \
           --non-interactive \
-          --domains $frontend_domain
+          --domains $frontend_domain $backend_domain
 EOF
   sleep 2
 }

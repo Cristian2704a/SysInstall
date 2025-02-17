@@ -185,14 +185,15 @@ backend_nginx_setup() {
   printf "${WHITE} 💻 Configurando nginx (backend)...${GRAY_LIGHT}"
   printf "\n\n"
   sleep 2
+
+  backend_hostname=$(echo "${backend_url/https:\/\/}")
   
 sudo su - root << EOF
 cat > /etc/nginx/sites-available/${instancia_add}-backend << 'END'
 server {
-  server_name $frontend_url;
+  server_name $backend_hostname;
   
-  location /api {
-    rewrite ^/api(/.*)$ \$1 break;
+  location / {
     proxy_pass http://127.0.0.1:${backend_port};
     proxy_http_version 1.1;
     proxy_set_header Upgrade \$http_upgrade;
@@ -203,14 +204,8 @@ server {
     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     proxy_cache_bypass \$http_upgrade;
   }
-  
-  root /home/deploy/${instancia_add}/frontend/build;
-  index index.html;
-  
-  location / {
-    try_files \$uri /index.html;
-  }
-  
+
+  # Bloquear solicitações de arquivos do GitHub
   location ~ /\.git {
     deny all;
   }
