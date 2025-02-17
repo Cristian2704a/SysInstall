@@ -79,9 +79,14 @@ frontend_set_env() {
   printf "\n\n"
   sleep 2
 
+  frontend_url=$(echo "${frontend_url/https:\/\/}")
+  frontend_url=${frontend_url%%/*}
+  frontend_url=https://$frontend_url
+
 sudo su - deploy << EOF1
   cat <<-EOF2 > /home/deploy/${instancia_add}/frontend/.env
-REACT_APP_BACKEND_URL=https://${frontend_url}/api
+REACT_APP_BACKEND_URL=${backend_url}
+REACT_APP_FRONTEND_URL=${frontend_url}
 REACT_APP_BACKEND_PROTOCOL=https
 REACT_APP_BACKEND_HOST=${frontend_url}
 REACT_APP_BACKEND_PORT=443

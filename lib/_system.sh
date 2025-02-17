@@ -61,20 +61,47 @@ EOF
 }
 
 system_create_user() {
-  print_banner
-  printf "${WHITE} 💻 Criando usuário deploy...${GRAY_LIGHT}"
-  printf "\n\n"
-  sleep 2
-  
-  # Escapando caracteres especiais da senha
-  ESCAPED_PASSWORD=$(printf '%q' "$mysql_root_password")
-  
-  sudo su - root <<EOF
-  useradd -m -s /bin/bash -G sudo deploy
-  echo "deploy:${ESCAPED_PASSWORD}" | chpasswd
-  usermod -aG sudo deploy
-EOF
-  sleep 2
+    print_banner
+    printf "${WHITE} 💻 Criando usuário deploy...${GRAY_LIGHT}"
+    printf "\n\n"
+
+    # Remover usuário e grupo se existirem (para garantir uma criação limpa)
+    sudo userdel -r deploy >/dev/null 2>&1 || true
+    sudo groupdel deploy >/dev/null 2>&1 || true
+
+    # Criar grupo deploy
+    sudo groupadd deploy || true
+
+    # Criar usuário deploy
+    sudo useradd -m -s /bin/bash -g deploy deploy
+
+    # Definir senha usando passwd diretamente
+    echo "${mysql_root_password}\n${mysql_root_password}" | sudo passwd deploy
+
+    # Adicionar ao grupo sudo
+    sudo usermod -aG sudo deploy
+
+    # Ajustar permissões do diretório home
+    if [ -d "/home/deploy" ]; then
+        sudo chown -R deploy:deploy /home/deploy
+        sudo chmod 755 /home/deploy
+    else
+        printf "${RED} ⚠️ Erro: Diretório /home/deploy não foi criado!${GRAY_LIGHT}"
+        printf "\n\n"
+        exit 1
+    fi
+
+    # Verificar se o usuário foi criado corretamente
+    if id "deploy" >/dev/null 2>&1; then
+        printf "${GREEN} ✅ Usuário deploy criado com sucesso!${GRAY_LIGHT}"
+        printf "\n\n"
+    else
+        printf "${RED} ⚠️ Erro: Falha ao criar usuário deploy!${GRAY_LIGHT}"
+        printf "\n\n"
+        exit 1
+    fi
+
+    sleep 2
 }
 
 system_git_clone() {
