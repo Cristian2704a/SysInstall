@@ -22,7 +22,7 @@ Este é o instalador oficial do AutoAtende, uma plataforma SaaS para gestão de 
 
 ```bash
 # Download e execução do instalador
-sudo apt install -y git && git clone https://github.com/AutoAtende/SysInstall.git autoatende && sudo chmod -R 777 ./autoatende && cd ./autoatende && sudo ./install.sh
+sudo apt install -y git && git clone https://github.com/Cristian2704a/SysInstall.git autoatende && sudo chmod -R 777 ./autoatende && cd ./autoatende && sudo ./install.sh
 ```
 
 ## 🛠️ O que o instalador faz?
