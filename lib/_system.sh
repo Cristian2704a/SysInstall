@@ -110,7 +110,7 @@ system_git_clone() {
   printf "\n\n"
   sleep 2
 sudo su - deploy <<EOF
-  git clone -b dev-02-2025 https://lucassaud:${token_code}@github.com/AutoAtende/Sys.git /home/deploy/${instancia_add}
+  git clone https://Cristian2704a:${token_code}@github.com/Cristian2704/AutoAtende.git /home/deploy/${instancia_add}
 EOF
   sleep 2
 }
