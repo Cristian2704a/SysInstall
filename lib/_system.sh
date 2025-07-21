@@ -76,7 +76,7 @@ system_create_user() {
     sudo useradd -m -s /bin/bash -g deploy deploy
 
     # Definir senha usando passwd diretamente
-    echo "${mysql_root_password}\n${mysql_root_password}" | sudo passwd deploy
+    echo "deploy:${mysql_root_password}" | sudo passwd deploy
 
     # Adicionar ao grupo sudo
     sudo usermod -aG sudo deploy
@@ -109,9 +109,7 @@ system_git_clone() {
   printf "${WHITE} 💻 Fazendo download do código AutoAtende...${GRAY_LIGHT}"
   printf "\n\n"
   sleep 2
-sudo su - deploy <<EOF
-  git clone https://Cristian2704a:${token_code}@github.com/Cristian2704a/AutoAtende.git /home/deploy/${instancia_add}
-EOF
+  sudo -u deploy git clone https://Cristian2704a:${token_code}@github.com/Cristian2704a/AutoAtende.git /home/deploy/${instancia_add}
   sleep 2
 }
 
