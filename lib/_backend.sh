@@ -110,7 +110,6 @@ sudo su - deploy <<EOF
 cd /home/deploy/${instancia_add}/backend
 npm run build
 cp .env dist/
-rm -rf src
 EOF
   sleep 2
 }
